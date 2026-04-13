@@ -57,11 +57,6 @@ export default function DiscoverPage() {
     };
   }, [search, category, activity, sortBy]);
 
-  const selectedSpace = React.useMemo(
-    () => spaces.find((space) => space.id === selectedSpaceId) ?? null,
-    [spaces, selectedSpaceId]
-  );
-
   return (
     <>
       <AppNavbar />
@@ -130,12 +125,9 @@ export default function DiscoverPage() {
                     <Grid container spacing={3}>
                       {spaces.map((space, index) => (
                         <Grid key={space.id} size={{ xs: 12, md: 6 }}>
-                          <SpaceCard
-                            space={space}
-                            rank={index + 1}
-                            selected={space.id === selectedSpaceId}
-                            onClick={() => setSelectedSpaceId(space.id)}
-                          />
+                          <Box onClick={() => setSelectedSpaceId(space.id)} sx={{ cursor: 'pointer' }}>
+                            <SpaceCard space={space} rank={index + 1} />
+                          </Box>
                         </Grid>
                       ))}
                     </Grid>
@@ -161,27 +153,6 @@ export default function DiscoverPage() {
                     Recommendations combine noise level, comfort score, shade, distance,
                     and activity suitability.
                   </Typography>
-
-                  <Box sx={{ display: 'grid', gap: 1.5 }}>
-                    {[
-                      'Quietness for focus and comfort',
-                      'Outdoor shade for healthier breaks',
-                      'Distance for faster decisions',
-                      'Activity fit for study, work, or relax',
-                    ].map((item) => (
-                      <Box
-                        key={item}
-                        sx={{
-                          p: 1.6,
-                          borderRadius: '18px',
-                          bgcolor: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                        }}
-                      >
-                        <Typography variant="body2">{item}</Typography>
-                      </Box>
-                    ))}
-                  </Box>
                 </Box>
 
                 <Box
@@ -197,8 +168,7 @@ export default function DiscoverPage() {
                   </Typography>
 
                   <Typography color="text.secondary">
-                    Best experience now:{' '}
-                    <strong>{selectedSpace?.name ?? spaces[0]?.name ?? 'No result'}</strong>
+                    Best experience now: <strong>{spaces[0]?.name ?? 'No result'}</strong>
                   </Typography>
                 </Box>
               </Grid>

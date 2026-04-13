@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import {
   Box,
   Card,
@@ -9,8 +10,10 @@ import {
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import PlaceIcon from '@mui/icons-material/Place';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { Space } from '../types/space';
 import { getNoiseLabel } from '../utils/spaceHelpers';
+import CompareButton from './CompareButton';
 
 interface SpaceCardProps {
   space: Space;
@@ -76,6 +79,14 @@ export default function SpaceCard({
                   />
                 ) : null}
                 <Chip size="small" label={space.category} variant="outlined" />
+                {typeof space.serenityScore === 'number' ? (
+                  <Chip
+                    size="small"
+                    label={`Serenity ${space.serenityScore}`}
+                    color="secondary"
+                    variant="outlined"
+                  />
+                ) : null}
               </Box>
 
               <Typography
@@ -177,7 +188,7 @@ export default function SpaceCard({
             }}
           >
             <Typography variant="body2" color="text.secondary">
-              {space.reason}
+              {space.activityExplanation ?? space.reason}
             </Typography>
           </Paper>
 
@@ -190,6 +201,36 @@ export default function SpaceCard({
               color="secondary"
               variant="outlined"
             />
+          </Box>
+
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', pt: 0.5 }}>
+            <Box
+              component={Link}
+              href={`/spaces/${space.id}`}
+              onClick={(event) => event.stopPropagation()}
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.8,
+                textDecoration: 'none',
+                color: 'primary.main',
+                fontWeight: 800,
+                fontSize: '0.95rem',
+                px: 1.6,
+                py: 1,
+                borderRadius: '999px',
+                bgcolor: 'rgba(79,70,229,0.08)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  bgcolor: 'rgba(79,70,229,0.14)',
+                },
+              }}
+            >
+              View details
+              <ArrowForwardIcon sx={{ fontSize: 16 }} />
+            </Box>
+
+            <CompareButton spaceId={space.id} />
           </Box>
         </Box>
       </CardContent>

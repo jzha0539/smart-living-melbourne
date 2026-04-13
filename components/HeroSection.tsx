@@ -4,6 +4,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import BoltIcon from '@mui/icons-material/Bolt';
 import StatsOverview from './StatsOverview';
 import { Space } from '../types/space';
+import Link from 'next/link';
 
 interface HeroSectionProps {
   spaces: Space[];
@@ -121,37 +122,41 @@ export default function HeroSection({
             }}
           >
             <Button
-              variant="contained"
-              size="large"
-              startIcon={<LocationOnIcon />}
-              sx={{
-                borderRadius: '999px',
-                px: 3.2,
-                py: 1.35,
-                textTransform: 'none',
-                fontWeight: 700,
-                boxShadow: '0 10px 24px rgba(79,70,229,0.28)',
-              }}
-            >
-              Explore spaces
-            </Button>
+  component={Link}
+  href="/discover"
+  variant="contained"
+  size="large"
+  startIcon={<LocationOnIcon />}
+  sx={{
+    borderRadius: '999px',
+    px: 3.2,
+    py: 1.35,
+    textTransform: 'none',
+    fontWeight: 700,
+    boxShadow: '0 10px 24px rgba(79,70,229,0.28)',
+  }}
+>
+  Explore spaces
+</Button>
 
-            <Button
-              variant="outlined"
-              size="large"
-              startIcon={<BoltIcon />}
-              sx={{
-                borderRadius: '999px',
-                px: 3.2,
-                py: 1.35,
-                textTransform: 'none',
-                fontWeight: 700,
-                bgcolor: 'rgba(255,255,255,0.74)',
-                borderColor: 'rgba(79,70,229,0.30)',
-              }}
-            >
-              See top suggestions
-            </Button>
+<Button
+  component={Link}
+  href="/suggestions"
+  variant="outlined"
+  size="large"
+  startIcon={<BoltIcon />}
+  sx={{
+    borderRadius: '999px',
+    px: 3.2,
+    py: 1.35,
+    textTransform: 'none',
+    fontWeight: 700,
+    bgcolor: 'rgba(255,255,255,0.74)',
+    borderColor: 'rgba(79,70,229,0.30)',
+  }}
+>
+  See top suggestions
+</Button>
           </Box>
 
           <StatsOverview spaces={spaces} />

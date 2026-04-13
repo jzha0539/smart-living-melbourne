@@ -5,11 +5,11 @@ import mapboxgl from 'mapbox-gl';
 import { Box, Paper, Typography } from '@mui/material';
 import { Space } from '../types/space';
 
-type MapPlaceholderProps = {
+interface MapPlaceholderProps {
   spaces: Space[];
   selectedSpaceId?: number | null;
   onSelectSpace?: (spaceId: number) => void;
-};
+}
 
 const FALLBACK_COORDS: Record<string, [number, number]> = {
   'Melbourne CBD': [144.9631, -37.8136],
@@ -19,39 +19,14 @@ const FALLBACK_COORDS: Record<string, [number, number]> = {
   Southbank: [144.965, -37.823],
 };
 
-function getCoords(space: Space, index: number): [number, number] {
-  const spaceWithCoords = space as Space & {
-    latitude?: number;
-    longitude?: number;
-  };
-
-  const hasRealCoords =
-    typeof spaceWithCoords.longitude === 'number' &&
-    typeof spaceWithCoords.latitude === 'number';
-
-  const baseCoords: [number, number] = hasRealCoords
-    ? [spaceWithCoords.longitude!, spaceWithCoords.latitude!]
-    : FALLBACK_COORDS[space.suburb] ?? [144.9631, -37.8136];
-
-  const angle = (index % 8) * (Math.PI / 4);
-  const ring = Math.floor(index / 8) + 1;
-  const offset = 0.0022 * ring;
-
-  return [
-    baseCoords[0] + Math.cos(angle) * offset,
-    baseCoords[1] + Math.sin(angle) * offset,
-  ];
-}
-
 export default function MapPlaceholder({
   spaces,
-  selectedSpaceId = null,
+  selectedSpaceId,
   onSelectSpace,
 }: MapPlaceholderProps) {
   const mapContainerRef = React.useRef<HTMLDivElement | null>(null);
   const mapRef = React.useRef<mapboxgl.Map | null>(null);
   const markersRef = React.useRef<mapboxgl.Marker[]>([]);
-  const coordsMapRef = React.useRef<Map<number, [number, number]>>(new Map());
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -68,7 +43,7 @@ export default function MapPlaceholder({
 
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: 'mapbox://styles/mapbox/standard',
       center: [144.9631, -37.8136],
       zoom: 12,
     });
@@ -77,9 +52,6 @@ export default function MapPlaceholder({
     mapRef.current = map;
 
     return () => {
-      markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current = [];
-      coordsMapRef.current.clear();
       map.remove();
       mapRef.current = null;
     };
@@ -91,46 +63,42 @@ export default function MapPlaceholder({
 
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
-    coordsMapRef.current.clear();
 
-    if (!spaces.length) return;
+    if (spaces.length === 0) return;
 
     const bounds = new mapboxgl.LngLatBounds();
 
-    spaces.forEach((space, index) => {
-      const coords = getCoords(space, index);
-      coordsMapRef.current.set(space.id, coords);
+    spaces.forEach((space) => {
+      const coords: [number, number] =
+        typeof space.longitude === 'number' &&
+        typeof space.latitude === 'number'
+          ? [space.longitude, space.latitude]
+          : FALLBACK_COORDS[space.suburb] ?? [144.9631, -37.8136];
 
-      const markerElement = document.createElement('div');
-      const isSelected = selectedSpaceId === space.id;
+      const el = document.createElement('div');
+      el.style.width = '16px';
+      el.style.height = '16px';
+      el.style.borderRadius = '999px';
+      el.style.background =
+        selectedSpaceId === space.id ? '#4f46e5' : '#0ea5e9';
+      el.style.border = '2px solid white';
+      el.style.boxShadow = '0 4px 10px rgba(15,23,42,0.2)';
+      el.style.cursor = 'pointer';
 
-      markerElement.style.width = isSelected ? '22px' : '18px';
-      markerElement.style.height = isSelected ? '22px' : '18px';
-      markerElement.style.borderRadius = '999px';
-      markerElement.style.background = isSelected ? '#4F46E5' : '#0EA5E9';
-      markerElement.style.border = '2px solid white';
-      markerElement.style.boxShadow = isSelected
-        ? '0 0 0 6px rgba(79,70,229,0.18)'
-        : '0 6px 16px rgba(15,23,42,0.18)';
-      markerElement.style.cursor = 'pointer';
-      markerElement.style.transition = 'all 0.2s ease';
-
-      markerElement.addEventListener('click', () => {
+      el.addEventListener('click', () => {
         onSelectSpace?.(space.id);
       });
 
-      const popup = new mapboxgl.Popup({ offset: 18 }).setHTML(`
+      const popup = new mapboxgl.Popup({ offset: 20 }).setHTML(`
         <div style="font-family: Arial, sans-serif; min-width: 180px;">
           <strong>${space.name}</strong><br/>
           ${space.suburb}<br/>
-          Category: ${space.category}<br/>
           Noise: ${space.noiseDb} dB<br/>
-          Comfort: ${space.comfort}/100<br/>
-          Shade: ${space.shade}%
+          Comfort: ${space.comfort}/100
         </div>
       `);
 
-      const marker = new mapboxgl.Marker({ element: markerElement })
+      const marker = new mapboxgl.Marker(el)
         .setLngLat(coords)
         .setPopup(popup)
         .addTo(map);
@@ -139,35 +107,8 @@ export default function MapPlaceholder({
       bounds.extend(coords);
     });
 
-    if (spaces.length === 1) {
-      map.flyTo({
-        center: bounds.getCenter(),
-        zoom: 14,
-        essential: true,
-      });
-    } else {
-      map.fitBounds(bounds, {
-        padding: 60,
-        maxZoom: 14,
-        duration: 800,
-      });
-    }
+    map.fitBounds(bounds, { padding: 60, maxZoom: 14 });
   }, [spaces, selectedSpaceId, onSelectSpace]);
-
-  React.useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !selectedSpaceId) return;
-
-    const coords = coordsMapRef.current.get(selectedSpaceId);
-    if (!coords) return;
-
-    map.flyTo({
-      center: coords,
-      zoom: 14.5,
-      essential: true,
-      duration: 900,
-    });
-  }, [selectedSpaceId]);
 
   return (
     <Paper
