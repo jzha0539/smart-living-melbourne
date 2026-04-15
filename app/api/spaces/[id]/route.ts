@@ -144,8 +144,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       LIMIT 200
     `);
 
-    const spaces = result.rows.map((row, index) => mapRowToSpace(row, index));
-    const found = spaces.find((space) => space.id === numericId);
+    const spaces = result.rows.map((row: DbRow, index: number) => mapRowToSpace(row, index));
+    const found = spaces.find((space: { id: number; }) => space.id === numericId);
 
     if (!found) {
       return NextResponse.json(

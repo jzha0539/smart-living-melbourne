@@ -130,7 +130,7 @@ export async function GET() {
       LIMIT 50
     `);
 
-    const spaces = result.rows.map((row, index) => mapRowToSpace(row, index));
+    const spaces = result.rows.map((row: DbRow, index: number) => mapRowToSpace(row, index));
 
     return NextResponse.json({
       success: true,
