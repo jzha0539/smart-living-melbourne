@@ -1,108 +1,229 @@
-import { Grid, Paper, Typography, Box, Chip } from '@mui/material';
-import { Space } from '../types/space';
+'use client';
 
-interface ComparePanelProps {
-  spaces: Space[];
-}
+import * as React from 'react';
+import {
+  Box,
+  Button,
+  MenuItem,
+  Paper,
+  TextField,
+} from '@mui/material';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import {
+  ActivityType,
+  CategoryFilter,
+  SortType,
+} from '../types/space';
 
-export default function ComparePanel({ spaces }: ComparePanelProps) {
-  if (spaces.length === 0) {
-    return (
-      <Paper
-        elevation={0}
-        sx={{
-          p: 4,
-          borderRadius: '32px',
-          bgcolor: 'white',
-          boxShadow: '0 12px 40px rgba(15, 23, 42, 0.08)',
-        }}
-      >
-        <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, mb: 1 }}>
-          No spaces selected
-        </Typography>
-        <Typography color="text.secondary">
-          Go back to Discover and click “Add to compare” on up to two places.
-        </Typography>
-      </Paper>
-    );
+type Props = {
+  search: string;
+  category: CategoryFilter;
+  activity: ActivityType;
+  sortBy: SortType;
+  onSearchChange: (value: string) => void;
+  onCategoryChange: (value: CategoryFilter) => void;
+  onActivityChange: (value: ActivityType) => void;
+  onSortChange: (value: SortType) => void;
+};
+
+export default function FilterPanel({
+  search,
+  category,
+  activity,
+  sortBy,
+  onSearchChange,
+  onCategoryChange,
+  onActivityChange,
+  onSortChange,
+}: Props) {
+  const [localSearch, setLocalSearch] = React.useState(search);
+  const [localCategory, setLocalCategory] = React.useState<CategoryFilter>(category);
+  const [localActivity, setLocalActivity] = React.useState<ActivityType>(activity);
+  const [localSortBy, setLocalSortBy] = React.useState<SortType>(sortBy);
+
+  React.useEffect(() => {
+    setLocalSearch(search);
+  }, [search]);
+
+  React.useEffect(() => {
+    setLocalCategory(category);
+  }, [category]);
+
+  React.useEffect(() => {
+    setLocalActivity(activity);
+  }, [activity]);
+
+  React.useEffect(() => {
+    setLocalSortBy(sortBy);
+  }, [sortBy]);
+
+  function handleApply() {
+    onSearchChange(localSearch.trim());
+    onCategoryChange(localCategory);
+    onActivityChange(localActivity);
+    onSortChange(localSortBy);
+  }
+
+  function handleReset() {
+    setLocalSearch('');
+    setLocalCategory('all');
+    setLocalActivity('study');
+    setLocalSortBy('best');
+
+    onSearchChange('');
+    onCategoryChange('all');
+    onActivityChange('study');
+    onSortChange('best');
+  }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    handleApply();
   }
 
   return (
-    <Grid container spacing={3}>
-      {spaces.map((space) => (
-        <Grid key={space.id} size={{ xs: 12, md: 6 }}>
-          <Paper
-            elevation={0}
+    <Paper
+      component="form"
+      onSubmit={handleSubmit}
+      elevation={0}
+      sx={{
+        p: { xs: 2, md: 2.5 },
+        borderRadius: '28px',
+        bgcolor: '#ffffff',
+        border: '1px solid #eceff5',
+        boxShadow: '0 12px 30px rgba(15,23,42,0.04)',
+      }}
+    >
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr',
+            md: '2fr 1fr 1fr 1fr auto',
+          },
+          gap: 2,
+          alignItems: 'center',
+        }}
+      >
+        <TextField
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
+          placeholder="Search suburb or place"
+          fullWidth
+          variant="outlined"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleApply();
+            }
+          }}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              borderRadius: '999px',
+              bgcolor: '#fff',
+              minHeight: 54,
+            },
+          }}
+        />
+
+        <TextField
+          select
+          label="Category"
+          value={localCategory}
+          onChange={(e) => setLocalCategory(e.target.value as CategoryFilter)}
+          fullWidth
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              borderRadius: '999px',
+              minHeight: 54,
+            },
+          }}
+        >
+          <MenuItem value="all">All categories</MenuItem>
+          <MenuItem value="park">Park</MenuItem>
+          <MenuItem value="library">Library</MenuItem>
+          <MenuItem value="rooftop">Rooftop</MenuItem>
+          <MenuItem value="urban">Urban</MenuItem>
+          <MenuItem value="indoor">Indoor</MenuItem>
+        </TextField>
+
+        <TextField
+          select
+          label="Activity"
+          value={localActivity}
+          onChange={(e) => setLocalActivity(e.target.value as ActivityType)}
+          fullWidth
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              borderRadius: '999px',
+              minHeight: 54,
+            },
+          }}
+        >
+          <MenuItem value="study">Study</MenuItem>
+          <MenuItem value="remote-work">Remote work</MenuItem>
+          <MenuItem value="relax">Relax</MenuItem>
+        </TextField>
+
+        <TextField
+          select
+          label="Sort by"
+          value={localSortBy}
+          onChange={(e) => setLocalSortBy(e.target.value as SortType)}
+          fullWidth
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              borderRadius: '999px',
+              minHeight: 54,
+            },
+          }}
+        >
+          <MenuItem value="best">Best match</MenuItem>
+          <MenuItem value="quietest">Quietest</MenuItem>
+          <MenuItem value="closest">Closest</MenuItem>
+          <MenuItem value="comfort">Highest comfort</MenuItem>
+        </TextField>
+
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 1.2,
+            flexDirection: { xs: 'column', lg: 'row' },
+          }}
+        >
+          <Button
+            type="submit"
+            variant="contained"
+            startIcon={<SearchRoundedIcon />}
             sx={{
-              p: 3,
-              borderRadius: '32px',
-              boxShadow: '0 12px 40px rgba(15, 23, 42, 0.08)',
-              bgcolor: 'white',
-              height: '100%',
+              minWidth: 160,
+              height: 54,
+              borderRadius: '999px',
+              textTransform: 'none',
+              fontWeight: 800,
+              fontSize: '1rem',
+              boxShadow: '0 12px 24px rgba(79,70,229,0.22)',
             }}
           >
-            <Typography sx={{ mb: 2.5, fontSize: '2rem', fontWeight: 900 }}>
-              {space.name}
-            </Typography>
+            Search
+          </Button>
 
-            <Grid container spacing={2}>
-              {[
-                { label: 'Noise', value: `${space.noiseDb} dB` },
-                { label: 'Comfort', value: `${space.comfort}/100` },
-                { label: 'Shade', value: `${space.shade}%` },
-                { label: 'Distance', value: `${space.distance} km` },
-                {
-                  label: 'Serenity',
-                  value:
-                    typeof space.serenityScore === 'number'
-                      ? `${space.serenityScore}`
-                      : 'N/A',
-                },
-              ].map((item) => (
-                <Grid key={item.label} size={{ xs: 6 }}>
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 2,
-                      borderRadius: '18px',
-                      bgcolor: '#f8fafc',
-                    }}
-                  >
-                    <Typography variant="body2" color="text.secondary">
-                      {item.label}
-                    </Typography>
-                    <Typography sx={{ fontSize: '1.6rem', fontWeight: 900 }}>
-                      {item.value}
-                    </Typography>
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
-
-            <Box sx={{ mt: 2 }}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  borderRadius: '18px',
-                  bgcolor: '#f8fafc',
-                  mb: 2,
-                }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  {space.activityExplanation ?? space.reason}
-                </Typography>
-              </Paper>
-
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {space.activityFit.map((item) => (
-                  <Chip key={item} label={item} variant="outlined" />
-                ))}
-              </Box>
-            </Box>
-          </Paper>
-        </Grid>
-      ))}
-    </Grid>
+          <Button
+            type="button"
+            variant="outlined"
+            onClick={handleReset}
+            sx={{
+              minWidth: 120,
+              height: 54,
+              borderRadius: '999px',
+              textTransform: 'none',
+              fontWeight: 800,
+            }}
+          >
+            Reset
+          </Button>
+        </Box>
+      </Box>
+    </Paper>
   );
 }

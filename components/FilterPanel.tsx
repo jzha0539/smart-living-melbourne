@@ -1,18 +1,21 @@
+'use client';
+
+import * as React from 'react';
 import {
   Box,
   Button,
-  FormControl,
-  InputLabel,
   MenuItem,
   Paper,
-  Select,
-  SelectChangeEvent,
   TextField,
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import { ActivityType, CategoryFilter, SortType } from '../types/space';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import {
+  ActivityType,
+  CategoryFilter,
+  SortType,
+} from '../types/space';
 
-interface FilterPanelProps {
+type Props = {
   search: string;
   category: CategoryFilter;
   activity: ActivityType;
@@ -21,7 +24,9 @@ interface FilterPanelProps {
   onCategoryChange: (value: CategoryFilter) => void;
   onActivityChange: (value: ActivityType) => void;
   onSortChange: (value: SortType) => void;
-}
+  onApply?: () => void;
+  onReset?: () => void;
+};
 
 export default function FilterPanel({
   search,
@@ -32,131 +37,196 @@ export default function FilterPanel({
   onCategoryChange,
   onActivityChange,
   onSortChange,
-}: FilterPanelProps) {
+  onApply,
+  onReset,
+}: Props) {
+  const [localSearch, setLocalSearch] = React.useState(search);
+  const [localCategory, setLocalCategory] = React.useState<CategoryFilter>(category);
+  const [localActivity, setLocalActivity] = React.useState<ActivityType>(activity);
+  const [localSortBy, setLocalSortBy] = React.useState<SortType>(sortBy);
+
+  React.useEffect(() => {
+    setLocalSearch(search);
+  }, [search]);
+
+  React.useEffect(() => {
+    setLocalCategory(category);
+  }, [category]);
+
+  React.useEffect(() => {
+    setLocalActivity(activity);
+  }, [activity]);
+
+  React.useEffect(() => {
+    setLocalSortBy(sortBy);
+  }, [sortBy]);
+
+  function handleApply() {
+    onSearchChange(localSearch.trim());
+    onCategoryChange(localCategory);
+    onActivityChange(localActivity);
+    onSortChange(localSortBy);
+    onApply?.();
+  }
+
+  function handleReset() {
+    setLocalSearch('');
+    setLocalCategory('all');
+    setLocalActivity('study');
+    setLocalSortBy('best');
+
+    onSearchChange('');
+    onCategoryChange('all');
+    onActivityChange('study');
+    onSortChange('best');
+    onReset?.();
+  }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    handleApply();
+  }
+
   return (
     <Paper
+      component="form"
+      onSubmit={handleSubmit}
       elevation={0}
       sx={{
-        p: { xs: 2, md: 2.2 },
+        p: { xs: 2, md: 2.5 },
         borderRadius: '28px',
-        bgcolor: 'rgba(255,255,255,0.88)',
-        backdropFilter: 'blur(12px)',
-        boxShadow: '0 18px 50px rgba(15, 23, 42, 0.10)',
-        border: '1px solid rgba(255,255,255,0.78)',
+        bgcolor: '#ffffff',
+        border: '1px solid #eceff5',
+        boxShadow: '0 12px 30px rgba(15,23,42,0.04)',
       }}
     >
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '2fr 1fr 1fr 1fr auto' },
-          gap: 1.5,
+          gridTemplateColumns: {
+            xs: '1fr',
+            md: '2fr 1fr 1fr 1fr auto',
+          },
+          gap: 2,
           alignItems: 'center',
         }}
       >
         <TextField
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
           placeholder="Search suburb or place"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
           fullWidth
-          size="small"
+          variant="outlined"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleApply();
+            }
+          }}
           sx={{
             '& .MuiOutlinedInput-root': {
-              borderRadius: '18px',
-              bgcolor: 'rgba(255,255,255,0.92)',
+              borderRadius: '999px',
+              bgcolor: '#fff',
+              minHeight: 54,
             },
           }}
         />
 
-        <FormControl
+        <TextField
+          select
+          label="Category"
+          value={localCategory}
+          onChange={(e) => setLocalCategory(e.target.value as CategoryFilter)}
           fullWidth
-          size="small"
           sx={{
             '& .MuiOutlinedInput-root': {
-              borderRadius: '18px',
-              bgcolor: 'rgba(255,255,255,0.92)',
+              borderRadius: '999px',
+              minHeight: 54,
             },
           }}
         >
-          <InputLabel>Category</InputLabel>
-          <Select
-            value={category}
-            label="Category"
-            onChange={(e: SelectChangeEvent) =>
-              onCategoryChange(e.target.value as CategoryFilter)
-            }
-          >
-            <MenuItem value="all">All categories</MenuItem>
-            <MenuItem value="Library">Library</MenuItem>
-            <MenuItem value="Park">Park</MenuItem>
-            <MenuItem value="Public Lounge">Public Lounge</MenuItem>
-          </Select>
-        </FormControl>
+          <MenuItem value="all">All categories</MenuItem>
+          <MenuItem value="Library">Library</MenuItem>
+          <MenuItem value="Park">Park</MenuItem>
+          <MenuItem value="Public Lounge">Public Lounge</MenuItem>
+        </TextField>
 
-        <FormControl
+        <TextField
+          select
+          label="Activity"
+          value={localActivity}
+          onChange={(e) => setLocalActivity(e.target.value as ActivityType)}
           fullWidth
-          size="small"
           sx={{
             '& .MuiOutlinedInput-root': {
-              borderRadius: '18px',
-              bgcolor: 'rgba(255,255,255,0.92)',
+              borderRadius: '999px',
+              minHeight: 54,
             },
           }}
         >
-          <InputLabel>Activity</InputLabel>
-          <Select
-            value={activity}
-            label="Activity"
-            onChange={(e: SelectChangeEvent) =>
-              onActivityChange(e.target.value as ActivityType)
-            }
-          >
-            <MenuItem value="study">Study</MenuItem>
-            <MenuItem value="remote work">Remote work</MenuItem>
-            <MenuItem value="relax">Relax</MenuItem>
-          </Select>
-        </FormControl>
+          <MenuItem value="study">Study</MenuItem>
+          <MenuItem value="remote work">Remote work</MenuItem>
+          <MenuItem value="relax">Relax</MenuItem>
+        </TextField>
 
-        <FormControl
+        <TextField
+          select
+          label="Sort by"
+          value={localSortBy}
+          onChange={(e) => setLocalSortBy(e.target.value as SortType)}
           fullWidth
-          size="small"
           sx={{
             '& .MuiOutlinedInput-root': {
-              borderRadius: '18px',
-              bgcolor: 'rgba(255,255,255,0.92)',
+              borderRadius: '999px',
+              minHeight: 54,
             },
           }}
         >
-          <InputLabel>Sort by</InputLabel>
-          <Select
-            value={sortBy}
-            label="Sort by"
-            onChange={(e: SelectChangeEvent) =>
-              onSortChange(e.target.value as SortType)
-            }
-          >
-            <MenuItem value="best">Best match</MenuItem>
-            <MenuItem value="quiet">Most quiet</MenuItem>
-            <MenuItem value="comfort">Highest comfort</MenuItem>
-            <MenuItem value="distance">Nearest</MenuItem>
-          </Select>
-        </FormControl>
+          <MenuItem value="best">Best match</MenuItem>
+          <MenuItem value="quiet">Quietest</MenuItem>
+          <MenuItem value="comfort">Highest comfort</MenuItem>
+          <MenuItem value="distance">Closest</MenuItem>
+        </TextField>
 
-        <Button
-          variant="contained"
-          startIcon={<SearchIcon />}
+        <Box
           sx={{
-            borderRadius: '999px',
-            px: 3,
-            py: 1.15,
-            minWidth: 148,
-            textTransform: 'none',
-            fontWeight: 700,
-            height: '100%',
-            boxShadow: '0 10px 24px rgba(79,70,229,0.24)',
+            display: 'flex',
+            gap: 1.2,
+            flexDirection: { xs: 'column', lg: 'row' },
           }}
         >
-          Search
-        </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            startIcon={<SearchRoundedIcon />}
+            sx={{
+              minWidth: 160,
+              height: 54,
+              borderRadius: '999px',
+              textTransform: 'none',
+              fontWeight: 800,
+              fontSize: '1rem',
+              boxShadow: '0 12px 24px rgba(79,70,229,0.22)',
+            }}
+          >
+            Search
+          </Button>
+
+          <Button
+            type="button"
+            variant="outlined"
+            onClick={handleReset}
+            sx={{
+              minWidth: 120,
+              height: 54,
+              borderRadius: '999px',
+              textTransform: 'none',
+              fontWeight: 800,
+            }}
+          >
+            Reset
+          </Button>
+        </Box>
       </Box>
     </Paper>
   );
