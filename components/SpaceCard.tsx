@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Box,
   Button,
@@ -12,6 +13,7 @@ import {
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
+import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import { Space } from '../types/space';
 
 type Props = {
@@ -43,8 +45,11 @@ function getSpaceImage(space: Space) {
   const category = space.category.toLowerCase();
 
   if (name.includes('birrarung')) return '/images/birrarung.jpg';
-  if (name.includes('enterprize')) return '/images/enterprize.jpg';
+  if (name.includes('enterprize') || name.includes('enterprise')) return '/images/enterprize.jpg';
   if (name.includes('skyfarm') || name.includes('mcec')) return '/images/skyfarm.jpg';
+  if (name.includes('ch1')) return '/images/rooftop.jpg';
+  if (name.includes('101 collins')) return '/images/rooftop.jpg';
+  if (name.includes('treasury')) return '/images/lounge.jpg';
 
   if (category.includes('park')) return '/images/park.jpg';
   if (category.includes('rooftop')) return '/images/rooftop.jpg';
@@ -52,6 +57,54 @@ function getSpaceImage(space: Space) {
   if (category.includes('public lounge')) return '/images/lounge.jpg';
 
   return '/images/1.jpg';
+}
+
+function getPredictedBestTime(
+  space: Space,
+  activity: 'study' | 'remote work' | 'relax' = 'study'
+) {
+  const noiseDb = space.noiseDb;
+  const comfort = space.comfort;
+  const shade = space.shade;
+
+  if (activity === 'study') {
+    if (noiseDb <= 50) return '9am–11am';
+    if (noiseDb <= 60) return '8am–10am';
+    if (noiseDb <= 70) return '7am–9am';
+    return 'before 8am';
+  }
+
+  if (activity === 'remote work') {
+    if (comfort >= 80) return '10am–1pm';
+    if (comfort >= 65) return '9am–12pm';
+    if (comfort >= 50) return '8am–10am';
+    return 'before 9am';
+  }
+
+  if (shade >= 70) return 'after 4pm';
+  if (shade >= 50) return '3pm–5pm';
+  return 'before 10am or after 5pm';
+}
+
+function getBestTimeLabel(space: Space) {
+  return {
+    study: getPredictedBestTime(space, 'study'),
+    remoteWork: getPredictedBestTime(space, 'remote work'),
+    relax: getPredictedBestTime(space, 'relax'),
+  };
+}
+
+function getEstimatedWalkMinutes(space: Space) {
+  return Math.max(3, Math.round(space.distance * 12));
+}
+
+function getRouteEfficiency(space: Space) {
+  const walk = getEstimatedWalkMinutes(space);
+
+  if (walk <= 8) return 'Very easy access';
+  if (walk <= 15) return 'Easy access';
+  if (walk <= 22) return 'Moderate access';
+  return 'Longer walk';
 }
 
 function MetricBar({
@@ -115,8 +168,19 @@ export default function SpaceCard({
   onAddToCompare,
   isCompared,
 }: Props) {
+  const router = useRouter();
+
   const serenity = getSerenity(space);
   const imageUrl = getSpaceImage(space);
+  const bestTime = getBestTimeLabel(space);
+  const walkMinutes = getEstimatedWalkMinutes(space);
+  const routeEfficiency = getRouteEfficiency(space);
+
+  function handleStartRoutine(activity: 'study' | 'remote work' | 'relax' = 'study') {
+    localStorage.setItem('routine-space', JSON.stringify(space));
+    localStorage.setItem('routine-activity', activity);
+    router.push('/routine');
+  }
 
   return (
     <Paper
@@ -139,7 +203,6 @@ export default function SpaceCard({
         },
       }}
     >
-      {/* top chips */}
       <Box
         sx={{
           display: 'flex',
@@ -209,7 +272,6 @@ export default function SpaceCard({
         }}
       />
 
-      {/* name */}
       <Typography
         sx={{
           fontSize: { xs: '2rem', md: '2.1rem' },
@@ -226,7 +288,6 @@ export default function SpaceCard({
         {space.suburb}
       </Typography>
 
-      {/* image block */}
       <Box
         sx={{
           position: 'relative',
@@ -281,7 +342,6 @@ export default function SpaceCard({
         </Box>
       </Box>
 
-      {/* metrics */}
       <MetricBar label="Noise" value={space.noiseDb} suffix=" dB" tone="blue" />
 
       <Typography sx={{ mb: 2.2, fontSize: '0.9rem', color: '#334155' }}>
@@ -291,23 +351,91 @@ export default function SpaceCard({
       <MetricBar label="Comfort" value={space.comfort} suffix="/100" tone="purple" />
       <MetricBar label="Shade" value={space.shade} suffix="%" tone="blue" />
 
-      {/* reason */}
       <Box
         sx={{
-          p: 2,
-          borderRadius: '18px',
-          bgcolor: '#f8fafc',
-          border: '1px solid #e9edf5',
-          color: '#334155',
-          fontSize: '0.95rem',
-          lineHeight: 1.65,
+          display: 'grid',
+          gap: 1.2,
           mb: 2,
         }}
       >
-        {space.reason}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 1.8,
+            borderRadius: '16px',
+            bgcolor: '#f8fafc',
+            border: '1px solid #e9edf5',
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: '0.78rem',
+              fontWeight: 900,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: '#5850ec',
+              mb: 0.7,
+            }}
+          >
+            Best time to visit
+          </Typography>
+
+          <Typography sx={{ fontSize: '0.95rem', color: '#334155', mb: 0.5 }}>
+            <strong>Study:</strong> {bestTime.study}
+          </Typography>
+          <Typography sx={{ fontSize: '0.95rem', color: '#334155', mb: 0.5 }}>
+            <strong>Remote work:</strong> {bestTime.remoteWork}
+          </Typography>
+          <Typography sx={{ fontSize: '0.95rem', color: '#334155' }}>
+            <strong>Relax:</strong> {bestTime.relax}
+          </Typography>
+        </Paper>
+
+        <Paper
+          elevation={0}
+          sx={{
+            p: 1.8,
+            borderRadius: '16px',
+            bgcolor: '#f8fafc',
+            border: '1px solid #e9edf5',
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: '0.78rem',
+              fontWeight: 900,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: '#0f172a',
+              mb: 0.7,
+            }}
+          >
+            Route insight
+          </Typography>
+
+          <Typography sx={{ fontSize: '0.95rem', color: '#334155', mb: 0.4 }}>
+            ~{walkMinutes} min walk
+          </Typography>
+          <Typography sx={{ fontSize: '0.92rem', color: '#64748b' }}>
+            {routeEfficiency}
+          </Typography>
+        </Paper>
+
+        <Box
+          sx={{
+            p: 2,
+            borderRadius: '18px',
+            bgcolor: '#f8fafc',
+            border: '1px solid #e9edf5',
+            color: '#334155',
+            fontSize: '0.95rem',
+            lineHeight: 1.65,
+          }}
+        >
+          {space.reason}
+        </Box>
       </Box>
 
-      {/* chips */}
       <Box
         sx={{
           display: 'flex',
@@ -363,7 +491,6 @@ export default function SpaceCard({
         />
       </Box>
 
-      {/* buttons */}
       <Box
         sx={{
           mt: 'auto',
@@ -395,34 +522,56 @@ export default function SpaceCard({
         </Button>
 
         <Button
-  onClick={() => onAddToCompare?.(space)}
-  disabled={isCompared}
-  variant={isCompared ? 'contained' : 'outlined'}
-  sx={{
-    px: 2.4,
-    py: 1.1,
-    minWidth: 0,
-    borderRadius: '999px',
-    textTransform: 'none',
-    fontWeight: 800,
-    fontSize: '1.05rem',
-    bgcolor: isCompared ? '#5850ec' : '#fff',
-    color: isCompared ? '#fff' : '#5850ec',
-    borderColor: '#8b82ff',
-    boxShadow: isCompared ? '0 8px 18px rgba(88,80,236,0.28)' : 'none',
-    '&:hover': {
-      bgcolor: isCompared ? '#4e46df' : '#f6f5ff',
-      borderColor: '#8b82ff',
-    },
-    '&.Mui-disabled': {
-      color: '#fff',
-      bgcolor: '#5850ec',
-      opacity: 0.95,
-    },
-  }}
->
-  {isCompared ? 'Added to compare' : 'Add to compare'}
-</Button>
+          onClick={() => handleStartRoutine('study')}
+          startIcon={<PlayArrowRoundedIcon />}
+          variant="contained"
+          sx={{
+            px: 2.4,
+            py: 1.1,
+            minWidth: 0,
+            borderRadius: '999px',
+            textTransform: 'none',
+            fontWeight: 800,
+            fontSize: '1.05rem',
+            bgcolor: '#0f172a',
+            color: '#fff',
+            '&:hover': {
+              bgcolor: '#111827',
+            },
+          }}
+        >
+          Start routine
+        </Button>
+
+        <Button
+          onClick={() => onAddToCompare?.(space)}
+          disabled={isCompared}
+          variant={isCompared ? 'contained' : 'outlined'}
+          sx={{
+            px: 2.4,
+            py: 1.1,
+            minWidth: 0,
+            borderRadius: '999px',
+            textTransform: 'none',
+            fontWeight: 800,
+            fontSize: '1.05rem',
+            bgcolor: isCompared ? '#5850ec' : '#fff',
+            color: isCompared ? '#fff' : '#5850ec',
+            borderColor: '#8b82ff',
+            boxShadow: isCompared ? '0 8px 18px rgba(88,80,236,0.28)' : 'none',
+            '&:hover': {
+              bgcolor: isCompared ? '#4e46df' : '#f6f5ff',
+              borderColor: '#8b82ff',
+            },
+            '&.Mui-disabled': {
+              color: '#fff',
+              bgcolor: '#5850ec',
+              opacity: 0.95,
+            },
+          }}
+        >
+          {isCompared ? 'Added to compare' : 'Add to compare'}
+        </Button>
       </Box>
     </Paper>
   );
