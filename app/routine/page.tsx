@@ -284,26 +284,22 @@ export default function RoutinePage() {
                 </Button>
 
                 <Button
-                  component="a"
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                    `${space.name}, ${space.suburb}, Melbourne`
-                  )}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  variant="contained"
-                  startIcon={<PlaceRoundedIcon />}
-                  sx={{
-                    borderRadius: '999px',
-                    textTransform: 'none',
-                    fontWeight: 800,
-                    bgcolor: '#5850ec',
-                    '&:hover': {
-                      bgcolor: '#4e46df',
-                    },
-                  }}
-                >
-                  Open route
-                </Button>
+  component={Link}
+  href="/route"
+  variant="contained"
+  startIcon={<PlaceRoundedIcon />}
+  sx={{
+    borderRadius: '999px',
+    textTransform: 'none',
+    fontWeight: 800,
+    bgcolor: '#5850ec',
+    '&:hover': {
+      bgcolor: '#4e46df',
+    },
+  }}
+>
+  Open route
+</Button>
               </Box>
             </Box>
           </Paper>
