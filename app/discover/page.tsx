@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Box,
@@ -25,7 +26,7 @@ function getBestScore(space: Space) {
   return (100 - space.noiseDb) * 0.45 + space.comfort * 0.35 + space.shade * 0.2;
 }
 
-export default function DiscoverPage() {
+function DiscoverPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedSpaceId = searchParams.get('spaceId');
@@ -461,5 +462,49 @@ export default function DiscoverPage() {
 
       <FloatingCompareButton count={compareSpaces.length} />
     </>
+  );
+}
+
+function DiscoverPageFallback() {
+  return (
+    <>
+      <AppNavbar />
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background:
+            'radial-gradient(circle at top left, rgba(79,70,229,0.08), transparent 26%), radial-gradient(circle at top right, rgba(14,165,233,0.06), transparent 20%), linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)',
+          py: { xs: 3, md: 5 },
+        }}
+      >
+        <Container maxWidth="xl">
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 3, md: 4 },
+              borderRadius: '32px',
+              bgcolor: 'rgba(255,255,255,0.62)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: '0 16px 50px rgba(15, 23, 42, 0.06)',
+              border: '1px solid rgba(255,255,255,0.72)',
+            }}
+          >
+            <Typography
+              sx={{ fontSize: { xs: '2rem', md: '3rem' }, fontWeight: 900 }}
+            >
+              Loading discover spaces...
+            </Typography>
+          </Paper>
+        </Container>
+      </Box>
+    </>
+  );
+}
+
+export default function DiscoverPage() {
+  return (
+    <Suspense fallback={<DiscoverPageFallback />}>
+      <DiscoverPageContent />
+    </Suspense>
   );
 }
