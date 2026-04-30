@@ -22,7 +22,7 @@ import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded';
 import CompareArrowsRoundedIcon from '@mui/icons-material/CompareArrowsRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import AppNavbar from '../components/AppNavbar';
-import SpaceCard from '../components/SpaceCard';
+import FloatingCompareButton from '../components/FloatingCompareButton';
 import { Space } from '../types/space';
 
 const fadeUp = keyframes`
@@ -80,28 +80,6 @@ function enrichSpaces(spaces: Space[]): Space[] {
         ? (space as Space & { serenityScore?: number }).serenityScore
         : calculateSerenity(space),
   }));
-}
-
-function getBestMatch(spaces: Space[]): Space | null {
-  if (!spaces.length) return null;
-
-  const ranked = [...enrichSpaces(spaces)].sort(
-    (a, b) =>
-      ((b as Space & { serenityScore?: number }).serenityScore ?? 0) -
-      ((a as Space & { serenityScore?: number }).serenityScore ?? 0)
-  );
-
-  return ranked[0];
-}
-
-function getTopPicks(spaces: Space[]): Space[] {
-  return [...enrichSpaces(spaces)]
-    .sort(
-      (a, b) =>
-        ((b as Space & { serenityScore?: number }).serenityScore ?? 0) -
-        ((a as Space & { serenityScore?: number }).serenityScore ?? 0)
-    )
-    .slice(0, 3);
 }
 
 async function fetchSpaces(): Promise<Space[]> {
@@ -184,43 +162,566 @@ function StatCard({
   );
 }
 
-function MetricCard({
+function NoiseDialCard({
+  spaces,
+  loading,
+  threshold,
+  onThresholdChange,
+  activeSpaceId,
+  onSelectSpace,
+}: {
+  spaces: Space[];
+  loading: boolean;
+  threshold: number;
+  onThresholdChange: (value: number) => void;
+  activeSpaceId: number | null;
+  onSelectSpace: (spaceId: number) => void;
+}) {
+  const minDb = 45;
+  const maxDb = 80;
+
+  const size = 190;
+  const dynamicStroke = 8 + ((threshold - minDb) / (maxDb - minDb)) * 14;
+  const stroke = dynamicStroke;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  const matchedCount = spaces.length;
+  const progress = (threshold - minDb) / (maxDb - minDb);
+  const dashOffset = circumference * (1 - progress);
+
+  function updateFromPointer(clientX: number, clientY: number, element: HTMLDivElement) {
+    const rect = element.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    const dx = clientX - cx;
+    const dy = clientY - cy;
+
+    let angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+    if (angle < 0) angle += 360;
+
+    const ratio = Math.max(0, Math.min(360, angle)) / 360;
+    const value = Math.round(minDb + ratio * (maxDb - minDb));
+    onThresholdChange(value);
+  }
+
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    updateFromPointer(e.clientX, e.clientY, el);
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.buttons !== 1) return;
+    updateFromPointer(e.clientX, e.clientY, e.currentTarget);
+  }
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2.2,
+        borderRadius: '20px',
+        bgcolor: alpha('#ffffff', 0.94),
+        ml: { md: 'auto' },
+        width: '100%',
+        maxWidth: 470,
+        minHeight: 255,
+      }}
+    >
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '190px 1fr' },
+          gap: 2,
+          alignItems: 'center',
+        }}
+      >
+        <Box
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          sx={{
+            position: 'relative',
+            width: size,
+            height: size,
+            mx: 'auto',
+            cursor: 'pointer',
+            touchAction: 'none',
+            userSelect: 'none',
+          }}
+        >
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke="rgba(148,163,184,0.16)"
+              strokeWidth={stroke}
+            />
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke="#5850ec"
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={dashOffset}
+              transform={`rotate(-90 ${size / 2} ${size / 2})`}
+              style={{
+                transition: 'stroke-dashoffset 0.18s ease, stroke-width 0.18s ease',
+              }}
+            />
+          </svg>
+
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              display: 'grid',
+              placeItems: 'center',
+              textAlign: 'center',
+              px: 2,
+            }}
+          >
+            <Box>
+              <Typography
+                sx={{
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: '#64748b',
+                }}
+              >
+                Noise threshold
+              </Typography>
+
+              <Typography
+                sx={{
+                  mt: 0.5,
+                  fontSize: '1.9rem',
+                  lineHeight: 1,
+                  fontWeight: 900,
+                  color: '#0f172a',
+                }}
+              >
+                {threshold} dB
+              </Typography>
+
+              <Typography
+                sx={{
+                  mt: 0.7,
+                  fontSize: '1rem',
+                  fontWeight: 800,
+                  color: '#5850ec',
+                }}
+              >
+                {loading ? '—' : `${matchedCount} places`}
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+
+        <Box sx={{ pr: { md: 1 } }}>
+          <Typography
+            sx={{
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: '#64748b',
+              mb: 1,
+            }}
+          >
+            Matching places
+          </Typography>
+
+          {loading ? (
+            <Typography sx={{ color: '#64748b' }}>Loading...</Typography>
+          ) : spaces.length === 0 ? (
+            <Typography sx={{ color: '#64748b' }}>Please turn the ring</Typography>
+          ) : (
+            <Box sx={{ display: 'grid', gap: 1 }}>
+              {spaces.slice(0, 3).map((space) => (
+                <Button
+                  key={space.id}
+                  onClick={() => {
+                    onSelectSpace(space.id);
+                    document
+                      .getElementById('noise-results')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  variant={activeSpaceId === space.id ? 'contained' : 'outlined'}
+                  sx={{
+                    justifyContent: 'space-between',
+                    borderRadius: '14px',
+                    px: 1.6,
+                    py: 1,
+                    textTransform: 'none',
+                    fontWeight: 800,
+                    fontSize: '0.95rem',
+                    bgcolor: activeSpaceId === space.id ? '#5850ec' : 'transparent',
+                    color: activeSpaceId === space.id ? '#fff' : '#334155',
+                    borderColor: 'rgba(88,80,236,0.32)',
+                    '&:hover': {
+                      bgcolor: activeSpaceId === space.id ? '#4e46df' : '#f8f7ff',
+                      borderColor: '#5850ec',
+                    },
+                  }}
+                >
+                  <Box sx={{ textAlign: 'left', mr: 1, overflow: 'hidden' }}>
+                    <Typography
+                      sx={{
+                        fontSize: '0.92rem',
+                        fontWeight: 800,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {space.name}
+                    </Typography>
+                  </Box>
+
+                  <Typography
+                    sx={{
+                      fontSize: '0.9rem',
+                      fontWeight: 900,
+                      color: activeSpaceId === space.id ? '#fff' : '#5850ec',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {space.noiseDb} dB
+                  </Typography>
+                </Button>
+              ))}
+            </Box>
+          )}
+        </Box>
+      </Box>
+    </Paper>
+  );
+}
+
+function HomeNoiseCard({
+  space,
+  rank,
+  highlight,
+  onAddToCompare,
+  isCompared,
+}: {
+  space: Space;
+  rank: number;
+  highlight: boolean;
+  onAddToCompare: (space: Space) => void;
+  isCompared: boolean;
+}) {
+  const router = useRouter();
+
+  function getImageSrc(target: Space) {
+    const name = target.name.toLowerCase();
+
+    if (name.includes('birrarung')) return '/images/birrarung.jpg';
+    if (name.includes('enterprise')) return '/images/enterprize.jpg';
+    if (name.includes('skyfarm')) return '/images/skyfarm.jpg';
+    if (name.includes('library')) return '/images/library.jpg';
+    if (name.includes('rooftop')) return '/images/rooftop.jpg';
+    if (name.includes('lounge')) return '/images/lounge.jpg';
+    if (name.includes('park')) return '/images/park.jpg';
+
+    const category = (target.category ?? '').toLowerCase();
+    if (category.includes('library')) return '/images/library.jpg';
+    if (category.includes('rooftop')) return '/images/rooftop.jpg';
+    if (category.includes('lounge')) return '/images/lounge.jpg';
+    if (category.includes('park')) return '/images/park.jpg';
+
+    return '/images/park.jpg';
+  }
+
+  function handleStartRoutine() {
+    localStorage.setItem('routine-space', JSON.stringify(space));
+    router.push('/routine');
+  }
+
+  function MetricBox({
   label,
   value,
 }: {
   label: string;
-  value: string | number;
+  value: string;
 }) {
   return (
     <Paper
       elevation={0}
       sx={{
-        p: 2,
-        borderRadius: '16px',
+        p: 2.2,
+        borderRadius: '22px',
         bgcolor: '#f8fafc',
         border: '1px solid #e5e7eb',
-        transition: 'transform 0.24s ease, box-shadow 0.24s ease',
-        '&:hover': {
-          transform: 'translateY(-3px)',
-          boxShadow: '0 10px 24px rgba(15,23,42,0.07)',
-        },
+        minHeight: 140,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
       }}
     >
       <Typography
         sx={{
-          fontSize: '0.72rem',
-          fontWeight: 800,
-          letterSpacing: '0.08em',
+          fontSize: '0.76rem',
+          fontWeight: 900,
           textTransform: 'uppercase',
+          letterSpacing: '0.14em',
           color: '#64748b',
-          mb: 0.4,
+          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
         }}
       >
         {label}
       </Typography>
-      <Typography sx={{ fontSize: { xs: '1.45rem', md: '1.9rem' }, fontWeight: 900 }}>
+
+      <Typography
+        sx={{
+          fontSize: { xs: '2.2rem', md: '2.9rem' },
+          lineHeight: 0.95,
+          fontWeight: 950,
+          letterSpacing: '-0.06em',
+          color: '#0f172a',
+          wordBreak: 'break-word',
+          fontFamily:
+            '"Arial Black", "Inter", "Helvetica Neue", Arial, sans-serif',
+          transform: 'skewX(-2deg)',
+          textShadow: '0 1px 0 rgba(255,255,255,0.4)',
+        }}
+      >
         {value}
       </Typography>
+    </Paper>
+  );
+}
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2.4,
+        borderRadius: '28px',
+        bgcolor: '#ffffff',
+        border: highlight
+          ? '2px solid rgba(88,80,236,0.34)'
+          : '1px solid #e5e7eb',
+        boxShadow: highlight
+          ? '0 20px 44px rgba(88,80,236,0.16)'
+          : '0 10px 26px rgba(15,23,42,0.05)',
+        transition: 'all 0.25s ease',
+        height: '100%',
+      }}
+    >
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 1.5,
+          mb: 1.6,
+          flexWrap: 'wrap',
+        }}
+      >
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Chip
+            label={`Top ${rank}`}
+            sx={{
+              borderRadius: '999px',
+              bgcolor: '#5b52f0',
+              color: '#fff',
+              fontWeight: 800,
+            }}
+          />
+
+          <Chip
+            label={space.category}
+            sx={{
+              borderRadius: '999px',
+              bgcolor: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#334155',
+              fontWeight: 700,
+            }}
+          />
+        </Box>
+
+        <Chip
+          label={`${space.distance} km`}
+          sx={{
+            borderRadius: '999px',
+            bgcolor: '#ffffff',
+            border: '1px solid #d1d5db',
+            color: '#334155',
+            fontWeight: 800,
+          }}
+        />
+      </Box>
+
+      {typeof space.serenityScore === 'number' && (
+        <Chip
+          label={`Serenity ${space.serenityScore}`}
+          sx={{
+            mb: 1.8,
+            borderRadius: '999px',
+            bgcolor: '#f0f9ff',
+            color: '#1d9bf0',
+            border: '1px solid #60a5fa',
+            fontWeight: 800,
+          }}
+        />
+      )}
+
+      <Typography
+        sx={{
+          fontSize: { xs: '2.15rem', md: '2.75rem' },
+          lineHeight: 1,
+          fontWeight: 900,
+          color: '#1e293b',
+          letterSpacing: '-0.05em',
+        }}
+      >
+        {space.name}
+      </Typography>
+
+      <Typography
+        sx={{
+          mt: 1,
+          color: '#64748b',
+          fontSize: '1rem',
+          textTransform: 'lowercase',
+        }}
+      >
+        {space.category?.toLowerCase()}
+      </Typography>
+
+      <Box
+        sx={{
+          mt: 2.2,
+          position: 'relative',
+          overflow: 'hidden',
+          borderRadius: '28px',
+          height: 240,
+          backgroundImage: `url(${getImageSrc(space)})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        <Chip
+          label={space.category}
+          sx={{
+            position: 'absolute',
+            top: 16,
+            left: 16,
+            borderRadius: '999px',
+            bgcolor: 'rgba(255,255,255,0.92)',
+            color: '#0f172a',
+            fontWeight: 800,
+          }}
+        />
+      </Box>
+
+      <Box
+        sx={{
+          mt: 2,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          gap: 1.5,
+        }}
+      >
+        <MetricBox label="Noise" value={`${space.noiseDb} dB`} />
+        <MetricBox label="Comfort" value={`${space.comfort}/100`} />
+        <MetricBox label="Best quiet time" value={space.quietTime} />
+        <MetricBox label="Distance" value={`${space.distance} km`} />
+      </Box>
+
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.1, mt: 2 }}>
+        <Chip
+          label={`Quiet time: ${space.quietTime}`}
+          sx={{ borderRadius: '999px', bgcolor: '#f3f4f6' }}
+        />
+        <Chip
+          label={`Crowd: ${space.crowd}`}
+          sx={{ borderRadius: '999px', bgcolor: '#f3f4f6' }}
+        />
+        <Chip
+          label={space.activityFit?.[0] ?? 'study'}
+          sx={{
+            borderRadius: '999px',
+            bgcolor: '#ffffff',
+            border: '1px solid #60a5fa',
+            color: '#1d9bf0',
+          }}
+        />
+      </Box>
+
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.2, mt: 2.2 }}>
+        <Button
+          component={Link}
+          href={`/discover?spaceId=${space.id}`}
+          sx={{
+            px: 2.2,
+            py: 1.1,
+            borderRadius: '999px',
+            textTransform: 'none',
+            fontWeight: 800,
+            fontSize: '1rem',
+            color: '#5850ec',
+            bgcolor: '#f1efff',
+            '&:hover': {
+              bgcolor: '#e9e7ff',
+            },
+          }}
+        >
+          View details
+        </Button>
+
+        <Button
+          onClick={handleStartRoutine}
+          variant="contained"
+          sx={{
+            px: 2.2,
+            py: 1.1,
+            borderRadius: '999px',
+            textTransform: 'none',
+            fontWeight: 800,
+            fontSize: '1rem',
+            bgcolor: '#081a44',
+            '&:hover': {
+              bgcolor: '#061536',
+            },
+          }}
+        >
+          Start routine
+        </Button>
+
+        <Button
+          onClick={() => onAddToCompare(space)}
+          variant={isCompared ? 'contained' : 'outlined'}
+          sx={{
+            px: 2.2,
+            py: 1.1,
+            borderRadius: '999px',
+            textTransform: 'none',
+            fontWeight: 800,
+            fontSize: '1rem',
+            borderColor: '#7c6cff',
+            color: isCompared ? '#fff' : '#5b52f0',
+            bgcolor: isCompared ? '#5b52f0' : 'transparent',
+            '&:hover': {
+              borderColor: '#5b52f0',
+              bgcolor: isCompared ? '#4f46e5' : '#f8f7ff',
+            },
+          }}
+        >
+          {isCompared ? 'Added to compare' : 'Add to compare'}
+        </Button>
+      </Box>
     </Paper>
   );
 }
@@ -237,6 +738,28 @@ export default function HomePage() {
   const [pageReady, setPageReady] = React.useState(false);
 
   const [compareSpaces, setCompareSpaces] = React.useState<Space[]>([]);
+
+  const [noiseThreshold, setNoiseThreshold] = React.useState(65);
+  const [activeNoiseSpaceId, setActiveNoiseSpaceId] = React.useState<number | null>(null);
+
+  const filteredNoiseSpaces = React.useMemo(() => {
+    return [...spaces]
+      .filter((space) => space.noiseDb <= noiseThreshold)
+      .sort((a, b) => a.noiseDb - b.noiseDb);
+  }, [spaces, noiseThreshold]);
+
+  React.useEffect(() => {
+    if (!filteredNoiseSpaces.length) {
+      setActiveNoiseSpaceId(null);
+      return;
+    }
+
+    const stillExists = filteredNoiseSpaces.some((space) => space.id === activeNoiseSpaceId);
+
+    if (!stillExists) {
+      setActiveNoiseSpaceId(filteredNoiseSpaces[0].id);
+    }
+  }, [filteredNoiseSpaces, activeNoiseSpaceId]);
 
   React.useEffect(() => {
     async function load() {
@@ -313,10 +836,7 @@ export default function HomePage() {
 
   const shouldRenderHome = !showIntro && pageReady;
 
-  const bestMatch = getBestMatch(spaces);
-  const topPicks = getTopPicks(spaces);
-
-  const quietSpacesCount = spaces.filter((space) => space.noiseDb <= 50).length;
+  const quietSpacesCount = spaces.filter((space) => space.noiseDb <= 65).length;
   const averageComfort =
     spaces.length > 0
       ? Math.round(spaces.reduce((sum, item) => sum + item.comfort, 0) / spaces.length)
@@ -349,9 +869,9 @@ export default function HomePage() {
               backgroundRepeat: 'no-repeat',
               backgroundPosition: 'center center',
               backgroundSize: 'cover',
-              transform: introLeaving ? 'scale(1.04)' : 'scale(1)',
+              transform: introLeaving ? 'scale(1.03)' : 'scale(1)',
               transition: 'transform 0.9s ease',
-              filter: 'grayscale(8%) contrast(1.03) brightness(1.02)',
+              filter: 'grayscale(4%) contrast(1.02) brightness(0.98)',
             }}
           />
 
@@ -360,10 +880,16 @@ export default function HomePage() {
               position: 'absolute',
               inset: 0,
               background: `
-                radial-gradient(circle at 18% 22%, rgba(99,102,241,0.14), transparent 20%),
-                radial-gradient(circle at 82% 76%, rgba(139,92,246,0.16), transparent 22%),
-                linear-gradient(180deg, rgba(248,250,252,0.62) 0%, rgba(238,242,255,0.48) 50%, rgba(248,250,252,0.62) 100%)
+                radial-gradient(circle at 18% 22%, rgba(99,102,241,0.12), transparent 20%),
+                radial-gradient(circle at 82% 76%, rgba(139,92,246,0.14), transparent 22%),
+                linear-gradient(
+                  180deg,
+                  rgba(248,250,252,0.40) 0%,
+                  rgba(248,250,252,0.56) 36%,
+                  rgba(248,250,252,0.78) 100%
+                )
               `,
+              backdropFilter: 'blur(2px)',
               animation: `${introGlow} 8s ease-in-out infinite`,
             }}
           />
@@ -380,6 +906,7 @@ export default function HomePage() {
             <Box
               sx={{
                 textAlign: 'center',
+                maxWidth: 1280,
                 transform: introLeaving ? 'scale(0.16)' : 'scale(1)',
                 opacity: introLeaving ? 0 : 1,
                 transition:
@@ -387,22 +914,39 @@ export default function HomePage() {
                 willChange: 'transform, opacity',
               }}
             >
+              <Chip
+                label="Smart Living Melbourne"
+                sx={{
+                  mb: 2.5,
+                  height: 38,
+                  px: 1.2,
+                  borderRadius: '999px',
+                  bgcolor: 'rgba(255,255,255,0.72)',
+                  color: '#4f46e5',
+                  border: '1px solid rgba(79,70,229,0.12)',
+                  boxShadow: '0 10px 30px rgba(15,23,42,0.08)',
+                  backdropFilter: 'blur(10px)',
+                  fontWeight: 800,
+                  fontSize: '0.92rem',
+                  letterSpacing: '0.02em',
+                }}
+              />
+
               <Typography
                 sx={{
-                  fontSize: { xs: '2.6rem', sm: '4rem', md: '6.2rem' },
-                  lineHeight: 0.96,
-                  fontWeight: 900,
-                  letterSpacing: '-0.08em',
-                  textTransform: 'uppercase',
+                  fontSize: { xs: '2.9rem', sm: '4.4rem', md: '6.4rem' },
+                  lineHeight: 0.94,
+                  fontWeight: 950,
+                  letterSpacing: '-0.07em',
                   color: '#0f172a',
+                  textAlign: 'center',
                   animation: introLeaving ? 'none' : `${introTextFloat} 5.4s ease-in-out infinite`,
-                  textShadow: '0 14px 40px rgba(15,23,42,0.08)',
-                  fontFamily:
-                    '"Arial Black", Inter, "Helvetica Neue", Arial, sans-serif',
+                  textShadow: '0 8px 28px rgba(255,255,255,0.42)',
+                  fontFamily: '"Arial Black", Inter, "Helvetica Neue", Arial, sans-serif',
                   '& .outlined': {
                     color: 'transparent',
-                    WebkitTextStroke: '1.5px rgba(15,23,42,0.9)',
-                    textShadow: 'none',
+                    WebkitTextStroke: '1.8px rgba(15,23,42,0.92)',
+                    textShadow: '0 8px 22px rgba(255,255,255,0.22)',
                   },
                 }}
               >
@@ -412,24 +956,43 @@ export default function HomePage() {
                 <Box
                   component="span"
                   className="outlined"
-                  sx={{ display: 'block', mt: { xs: 0.4, md: 0.2 } }}
+                  sx={{
+                    display: 'block',
+                    mt: { xs: 0.45, md: 0.2 },
+                  }}
                 >
                   IDEAL LIFE
                 </Box>
               </Typography>
 
-              <Typography
+              <Box
                 sx={{
-                  mt: 3,
-                  fontSize: { xs: '0.92rem', md: '1rem' },
-                  letterSpacing: '0.28em',
-                  textTransform: 'uppercase',
-                  color: 'rgba(15,23,42,0.72)',
+                  mt: 3.2,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  px: 2.6,
+                  py: 1.15,
+                  borderRadius: '999px',
+                  bgcolor: 'rgba(255,255,255,0.74)',
+                  border: '1px solid rgba(15,23,42,0.08)',
+                  boxShadow: '0 12px 30px rgba(15,23,42,0.08)',
+                  backdropFilter: 'blur(10px)',
                   animation: introLeaving ? 'none' : `${introHintFade} 2.2s ease-in-out infinite`,
                 }}
               >
-                Tap anywhere to enter
-              </Typography>
+                <Typography
+                  sx={{
+                    fontSize: { xs: '0.95rem', md: '1rem' },
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: '#334155',
+                  }}
+                >
+                  Tap anywhere to enter
+                </Typography>
+              </Box>
             </Box>
           </Box>
         </Box>
@@ -635,43 +1198,14 @@ export default function HomePage() {
                           animationDelay: '0.26s',
                         }}
                       >
-                        <Paper
-                          elevation={0}
-                          sx={{
-                            p: 2.2,
-                            borderRadius: '16px',
-                            bgcolor: alpha('#ffffff', 0.94),
-                            ml: { md: 'auto' },
-                            width: { md: '100%' },
-                            maxWidth: 360,
-                          }}
-                        >
-                          <Typography
-                            sx={{
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              letterSpacing: '0.08em',
-                              textTransform: 'uppercase',
-                              color: '#64748b',
-                            }}
-                          >
-                            Live snapshot
-                          </Typography>
-                          <Typography
-                            sx={{
-                              mt: 0.8,
-                              fontSize: '1.85rem',
-                              lineHeight: 1,
-                              fontWeight: 900,
-                              color: '#0f172a',
-                            }}
-                          >
-                            {loading ? '—' : `${quietSpacesCount} quiet spaces`}
-                          </Typography>
-                          <Typography sx={{ mt: 1, color: '#475569' }}>
-                            Fast overview of calm, comfortable, and nearby choices.
-                          </Typography>
-                        </Paper>
+                        <NoiseDialCard
+                          spaces={filteredNoiseSpaces}
+                          loading={loading}
+                          threshold={noiseThreshold}
+                          onThresholdChange={setNoiseThreshold}
+                          activeSpaceId={activeNoiseSpaceId}
+                          onSelectSpace={setActiveNoiseSpaceId}
+                        />
                       </Box>
                     </Box>
                   </Box>
@@ -691,7 +1225,7 @@ export default function HomePage() {
                   >
                     <StatCard
                       icon={<VolumeOffRoundedIcon sx={{ transform: 'translateY(2px)' }} />}
-                      label="Quiet spaces"
+                      label="Quiet spaces under 65 dB"
                       value={loading ? '—' : quietSpacesCount}
                     />
                     <StatCard
@@ -713,7 +1247,6 @@ export default function HomePage() {
                 </Box>
               </Paper>
 
-              {/* compare strip */}
               <Paper
                 elevation={0}
                 sx={{
@@ -819,21 +1352,17 @@ export default function HomePage() {
                 </Box>
               </Paper>
 
-              {/* Bottom two panels */}
               <Box
                 sx={{
                   mt: 3,
                   display: 'grid',
-                  gridTemplateColumns: {
-                    xs: '1fr',
-                    xl: 'minmax(0, 1.65fr) 360px',
-                  },
+                  gridTemplateColumns: '1fr',
                   gap: 3,
                   alignItems: 'start',
                 }}
               >
-                {/* Left panel: Top picks */}
                 <Paper
+                  id="noise-results"
                   elevation={0}
                   sx={{
                     p: { xs: 2.5, md: 3 },
@@ -844,8 +1373,6 @@ export default function HomePage() {
                     animation: `${fadeUp} 0.85s ease both`,
                     animationDelay: '0.12s',
                     width: '100%',
-                    justifySelf: 'stretch',
-                    alignSelf: 'start',
                   }}
                 >
                   <Typography
@@ -857,12 +1384,11 @@ export default function HomePage() {
                       letterSpacing: '-0.04em',
                     }}
                   >
-                    Top picks for you
+                    Noise-matched places
                   </Typography>
 
                   <Typography color="text.secondary" sx={{ mb: 3 }}>
-                    Smart recommendations based on your activity, comfort, and
-                    quietness preferences.
+                    Top 3 places below {noiseThreshold} dB.
                   </Typography>
 
                   {error ? (
@@ -884,6 +1410,30 @@ export default function HomePage() {
                         />
                       ))}
                     </Box>
+                  ) : filteredNoiseSpaces.length === 0 ? (
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 3,
+                        borderRadius: '20px',
+                        border: '1px solid #e5e7eb',
+                        bgcolor: '#ffffff',
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: '1.35rem',
+                          fontWeight: 900,
+                          color: '#0f172a',
+                        }}
+                      >
+                        No places match the current noise threshold
+                      </Typography>
+
+                      <Typography color="text.secondary" sx={{ mt: 1 }}>
+                        Increase the dial to show more places.
+                      </Typography>
+                    </Paper>
                   ) : (
                     <Box
                       sx={{
@@ -892,22 +1442,27 @@ export default function HomePage() {
                         gap: 3,
                       }}
                     >
-                      {topPicks.map((space, index) => (
+                      {filteredNoiseSpaces.slice(0, 3).map((space, index) => (
                         <Box
-                          key={`${space.name}-${index}`}
-                          sx={{
-                            animation: `${fadeUp} 0.75s ease both`,
-                            animationDelay: `${0.12 * index}s`,
-                            transition: 'transform 0.28s ease',
-                            '&:hover': {
-                              transform: 'translateY(-6px)',
-                            },
-                          }}
-                        >
-                          <SpaceCard
+  key={`${space.name}-${index}`}
+  sx={{
+    animation: `${fadeUp} 0.75s ease both`,
+    animationDelay: `${0.12 * index}s`,
+    transition: 'all 0.28s ease',
+    transform:
+      activeNoiseSpaceId === space.id
+        ? 'translateY(-6px)'
+        : 'translateY(0)',
+    borderRadius: '28px',
+    '&:hover': {
+      transform: 'translateY(-6px)',
+    },
+  }}
+>
+                          <HomeNoiseCard
                             space={space}
                             rank={index + 1}
-                            highlight={index === 0}
+                            highlight={activeNoiseSpaceId === space.id}
                             onAddToCompare={handleAddToCompare}
                             isCompared={compareSpaces.some(
                               (item) => item.name === space.name
@@ -918,145 +1473,10 @@ export default function HomePage() {
                     </Box>
                   )}
                 </Paper>
-
-                {/* Right panel: Best match */}
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: { xs: 2.5, md: 3 },
-                    borderRadius: '22px',
-                    border: '1px solid #dbe1e8',
-                    bgcolor: '#ffffff',
-                    boxShadow: '0 18px 50px rgba(15,23,42,0.06)',
-                    animation: `${fadeUp} 0.85s ease both`,
-                    animationDelay: '0.18s',
-                    width: '100%',
-                    maxWidth: 360,
-                    justifySelf: { xl: 'end' },
-                    alignSelf: 'start',
-                    ml: { xl: 'auto' },
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      fontSize: '0.8rem',
-                      fontWeight: 900,
-                      letterSpacing: '0.12em',
-                      textTransform: 'uppercase',
-                      color: '#15803d',
-                      mb: 1.6,
-                    }}
-                  >
-                    Best match right now
-                  </Typography>
-
-                  {loading ? (
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 2,
-                      }}
-                    >
-                      <Skeleton variant="text" width="80%" height={54} />
-                      <Skeleton variant="text" width="50%" height={30} />
-
-                      <Box
-                        sx={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr',
-                          gap: 1.5,
-                        }}
-                      >
-                        {[1, 2, 3, 4].map((item) => (
-                          <Skeleton
-                            key={item}
-                            variant="rounded"
-                            height={96}
-                            sx={{ borderRadius: '16px' }}
-                          />
-                        ))}
-                      </Box>
-
-                      <Skeleton
-                        variant="rounded"
-                        height={72}
-                        sx={{ borderRadius: '16px' }}
-                      />
-                    </Box>
-                  ) : bestMatch ? (
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 2,
-                      }}
-                    >
-                      <Box>
-                        <Typography
-                          sx={{
-                            fontSize: { xs: '2rem', md: '2.4rem' },
-                            lineHeight: 1,
-                            fontWeight: 900,
-                            letterSpacing: '-0.04em',
-                            color: '#0f172a',
-                          }}
-                        >
-                          {bestMatch.name}
-                        </Typography>
-                        <Typography color="text.secondary" sx={{ mt: 1 }}>
-                          {bestMatch.category} · {bestMatch.suburb}
-                        </Typography>
-                      </Box>
-
-                      <Box
-                        sx={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr',
-                          gap: 1.5,
-                        }}
-                      >
-                        <MetricCard label="Noise" value={`${bestMatch.noiseDb} dB`} />
-                        <MetricCard label="Comfort" value={`${bestMatch.comfort}/100`} />
-                        <MetricCard label="Best quiet time" value={bestMatch.quietTime} />
-                        <MetricCard label="Distance" value={`${bestMatch.distance} km`} />
-                      </Box>
-
-                      <Paper
-                        elevation={0}
-                        sx={{
-                          p: 2,
-                          borderRadius: '16px',
-                          bgcolor: '#05264d',
-                          color: '#fff',
-                          overflow: 'hidden',
-                          position: 'relative',
-                        }}
-                      >
-                        <Typography
-                          sx={{
-                            fontSize: '0.8rem',
-                            fontWeight: 900,
-                            letterSpacing: '0.08em',
-                            textTransform: 'uppercase',
-                            color: '#fde68a',
-                            mb: 0.8,
-                          }}
-                        >
-                          Why this works
-                        </Typography>
-                        <Typography sx={{ color: 'rgba(255,255,255,0.88)' }}>
-                          {bestMatch.reason}
-                        </Typography>
-                      </Paper>
-                    </Box>
-                  ) : (
-                    <Typography color="text.secondary">No current result.</Typography>
-                  )}
-                </Paper>
               </Box>
             </Container>
           </Box>
+          <FloatingCompareButton count={compareSpaces.length} />
         </>
       )}
     </>

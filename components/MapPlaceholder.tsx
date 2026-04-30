@@ -58,6 +58,43 @@ export default function MapPlaceholder({
   }, []);
 
   React.useEffect(() => {
+    const styleId = 'slm-map-marker-animations';
+
+    if (document.getElementById(styleId)) return;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.innerHTML = `
+      @keyframes slm-marker-pulse {
+        0% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 rgba(88,80,236,0.36), 0 10px 24px rgba(88,80,236,0.28);
+        }
+        50% {
+          transform: scale(1.18);
+          box-shadow: 0 0 0 14px rgba(88,80,236,0.10), 0 10px 28px rgba(88,80,236,0.42);
+        }
+        100% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 rgba(88,80,236,0), 0 10px 24px rgba(88,80,236,0.28);
+        }
+      }
+
+      @keyframes slm-marker-ring {
+        0% {
+          transform: translate(-50%, -50%) scale(0.8);
+          opacity: 0.95;
+        }
+        100% {
+          transform: translate(-50%, -50%) scale(1.8);
+          opacity: 0;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }, []);
+
+  React.useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
@@ -67,23 +104,57 @@ export default function MapPlaceholder({
     if (spaces.length === 0) return;
 
     const bounds = new mapboxgl.LngLatBounds();
+    let selectedCoords: [number, number] | null = null;
 
     spaces.forEach((space) => {
       const coords: [number, number] =
-        typeof space.longitude === 'number' &&
-        typeof space.latitude === 'number'
+        typeof space.longitude === 'number' && typeof space.latitude === 'number'
           ? [space.longitude, space.latitude]
           : FALLBACK_COORDS[space.suburb] ?? [144.9631, -37.8136];
 
+      const isSelected = selectedSpaceId === space.id;
+
       const el = document.createElement('div');
-      el.style.width = '16px';
-      el.style.height = '16px';
-      el.style.borderRadius = '999px';
-      el.style.background =
-        selectedSpaceId === space.id ? '#4f46e5' : '#0ea5e9';
-      el.style.border = '2px solid white';
-      el.style.boxShadow = '0 4px 10px rgba(15,23,42,0.2)';
+      el.style.position = 'relative';
+      el.style.width = '32px';
+      el.style.height = '32px';
+      el.style.display = 'flex';
+      el.style.alignItems = 'center';
+      el.style.justifyContent = 'center';
       el.style.cursor = 'pointer';
+
+      const inner = document.createElement('div');
+      inner.style.position = 'relative';
+      inner.style.width = isSelected ? '24px' : '16px';
+      inner.style.height = isSelected ? '24px' : '16px';
+      inner.style.borderRadius = '999px';
+      inner.style.background = isSelected ? '#5850ec' : '#0ea5e9';
+      inner.style.border = '3px solid white';
+      inner.style.boxShadow = isSelected
+        ? '0 0 0 10px rgba(88,80,236,0.18), 0 10px 24px rgba(88,80,236,0.35)'
+        : '0 6px 14px rgba(14,165,233,0.28)';
+      inner.style.transition = 'all 0.25s ease';
+
+      if (isSelected) {
+        inner.style.animation = 'slm-marker-pulse 1.35s ease-in-out infinite';
+
+        const ring = document.createElement('div');
+        ring.style.position = 'absolute';
+        ring.style.left = '50%';
+        ring.style.top = '50%';
+        ring.style.width = '24px';
+        ring.style.height = '24px';
+        ring.style.borderRadius = '999px';
+        ring.style.border = '2px solid rgba(88,80,236,0.35)';
+        ring.style.transform = 'translate(-50%, -50%)';
+        ring.style.pointerEvents = 'none';
+        ring.style.animation = 'slm-marker-ring 1.35s ease-out infinite';
+        inner.appendChild(ring);
+
+        selectedCoords = coords;
+      }
+
+      el.appendChild(inner);
 
       el.addEventListener('click', () => {
         onSelectSpace?.(space.id);
@@ -98,16 +169,33 @@ export default function MapPlaceholder({
         </div>
       `);
 
-      const marker = new mapboxgl.Marker(el)
+      const marker = new mapboxgl.Marker({
+        element: el,
+        anchor: 'center',
+      })
         .setLngLat(coords)
         .setPopup(popup)
         .addTo(map);
+
+      if (isSelected) {
+        popup.addTo(map);
+      }
 
       markersRef.current.push(marker);
       bounds.extend(coords);
     });
 
-    map.fitBounds(bounds, { padding: 60, maxZoom: 14 });
+    if (selectedCoords) {
+      map.flyTo({
+        center: selectedCoords,
+        zoom: 15,
+        speed: 1.1,
+        curve: 1.2,
+        essential: true,
+      });
+    } else {
+      map.fitBounds(bounds, { padding: 60, maxZoom: 14 });
+    }
   }, [spaces, selectedSpaceId, onSelectSpace]);
 
   return (

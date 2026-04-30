@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Box,
   Button,
@@ -17,6 +17,7 @@ import AppNavbar from '../../components/AppNavbar';
 import FilterPanel from '../../components/FilterPanel';
 import MapPlaceholder from '../../components/MapPlaceholder';
 import SpaceCard from '../../components/SpaceCard';
+import FloatingCompareButton from '../../components/FloatingCompareButton';
 import { ActivityType, CategoryFilter, SortType, Space } from '../../types/space';
 import { getSpaces } from '../../lib/api-client';
 
@@ -26,6 +27,8 @@ function getBestScore(space: Space) {
 
 export default function DiscoverPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedSpaceId = searchParams.get('spaceId');
 
   const [search, setSearch] = React.useState('');
   const [category, setCategory] = React.useState<CategoryFilter>('all');
@@ -53,7 +56,12 @@ export default function DiscoverPage() {
 
         if (!cancelled) {
           setSpaces(data);
-          setSelectedSpaceId(data[0]?.id ?? null);
+
+          const matchedId = requestedSpaceId ? Number(requestedSpaceId) : null;
+          const hasMatchedSpace =
+            matchedId !== null && data.some((space) => space.id === matchedId);
+
+          setSelectedSpaceId(hasMatchedSpace ? matchedId : data[0]?.id ?? null);
         }
       } catch (err) {
         if (!cancelled) {
@@ -71,7 +79,7 @@ export default function DiscoverPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [requestedSpaceId]);
 
   React.useEffect(() => {
     const stored = localStorage.getItem('compare-spaces');
@@ -146,6 +154,23 @@ export default function DiscoverPage() {
 
     return result;
   }, [spaces, search, category, activity, sortBy, hasAppliedFilters]);
+
+  React.useEffect(() => {
+    if (!filteredSpaces.length) {
+      setSelectedSpaceId(null);
+      return;
+    }
+
+    const stillExists = filteredSpaces.some((space) => space.id === selectedSpaceId);
+
+    if (!stillExists) {
+      const matchedId = requestedSpaceId ? Number(requestedSpaceId) : null;
+      const hasMatchedFilteredSpace =
+        matchedId !== null && filteredSpaces.some((space) => space.id === matchedId);
+
+      setSelectedSpaceId(hasMatchedFilteredSpace ? matchedId : filteredSpaces[0]?.id ?? null);
+    }
+  }, [filteredSpaces, selectedSpaceId, requestedSpaceId]);
 
   function handleAddToCompare(space: Space) {
     setCompareSpaces((prev) => {
@@ -226,7 +251,7 @@ export default function DiscoverPage() {
             <Grid container spacing={3} sx={{ mt: 1 }}>
               <Grid size={{ xs: 12, lg: 8 }}>
                 <MapPlaceholder
-                  spaces={spaces}
+                  spaces={filteredSpaces}
                   selectedSpaceId={selectedSpaceId}
                   onSelectSpace={setSelectedSpaceId}
                 />
@@ -331,62 +356,6 @@ export default function DiscoverPage() {
                     </Box>
                   </Box>
                 </Paper>
-
-                <Box sx={{ mt: 4 }}>
-                  <Typography
-                    sx={{ fontSize: { xs: '2rem', md: '3rem' }, fontWeight: 900, mb: 1 }}
-                  >
-                    All matching spaces
-                  </Typography>
-
-                  <Typography color="text.secondary" sx={{ mb: 3 }}>
-                    Browse every result that matches your selected filters.
-                  </Typography>
-
-                  {error ? (
-                    <Box sx={{ color: 'error.main' }}>{error}</Box>
-                  ) : isLoading ? (
-                    <Box>Loading spaces...</Box>
-                  ) : filteredSpaces.length === 0 ? (
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 3,
-                        borderRadius: '24px',
-                        border: '1px solid #e5e7eb',
-                        bgcolor: '#ffffff',
-                      }}
-                    >
-                      <Typography sx={{ fontSize: '1.4rem', fontWeight: 900 }}>
-                        No matching spaces
-                      </Typography>
-                      <Typography color="text.secondary" sx={{ mt: 1 }}>
-                        Try a different keyword or adjust your filters.
-                      </Typography>
-                    </Paper>
-                  ) : (
-                    <Grid container spacing={3}>
-                      {filteredSpaces.map((space, index) => (
-                        <Grid key={space.id} size={{ xs: 12, md: 6 }}>
-                          <Box
-                            onClick={() => setSelectedSpaceId(space.id)}
-                            sx={{ cursor: 'pointer' }}
-                          >
-                            <SpaceCard
-                              space={space}
-                              rank={index + 1}
-                              highlight={index === 0}
-                              onAddToCompare={handleAddToCompare}
-                              isCompared={compareSpaces.some(
-                                (item) => item.name === space.name
-                              )}
-                            />
-                          </Box>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  )}
-                </Box>
               </Grid>
 
               <Grid size={{ xs: 12, lg: 4 }}>
@@ -422,14 +391,75 @@ export default function DiscoverPage() {
                   </Typography>
 
                   <Typography color="text.secondary">
-                    Best experience now: <strong>{spaces[0]?.name ?? 'No result'}</strong>
+                    Best experience now:{' '}
+                    <strong>
+                      {filteredSpaces[0]?.name ?? spaces[0]?.name ?? 'No result'}
+                    </strong>
                   </Typography>
                 </Box>
               </Grid>
             </Grid>
+
+            <Box sx={{ mt: 4 }}>
+              <Typography
+                sx={{ fontSize: { xs: '2rem', md: '3rem' }, fontWeight: 900, mb: 1 }}
+              >
+                All matching spaces
+              </Typography>
+
+              <Typography color="text.secondary" sx={{ mb: 3 }}>
+                Browse every result that matches your selected filters.
+              </Typography>
+
+              {error ? (
+                <Box sx={{ color: 'error.main' }}>{error}</Box>
+              ) : isLoading ? (
+                <Box>Loading spaces...</Box>
+              ) : filteredSpaces.length === 0 ? (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    borderRadius: '24px',
+                    border: '1px solid #e5e7eb',
+                    bgcolor: '#ffffff',
+                  }}
+                >
+                  <Typography sx={{ fontSize: '1.4rem', fontWeight: 900 }}>
+                    No matching spaces
+                  </Typography>
+                  <Typography color="text.secondary" sx={{ mt: 1 }}>
+                    Try a different keyword or adjust your filters.
+                  </Typography>
+                </Paper>
+              ) : (
+                <Grid container spacing={3}>
+                  {filteredSpaces.map((space, index) => (
+                    <Grid key={space.id} size={{ xs: 12, md: 6, xl: 4 }}>
+                      <Box
+                        onClick={() => setSelectedSpaceId(space.id)}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        <SpaceCard
+                          space={space}
+                          rank={index + 1}
+                          highlight={index === 0}
+                          onAddToCompare={handleAddToCompare}
+                          isCompared={compareSpaces.some(
+                            (item) => item.name === space.name
+                          )}
+                        />
+                      </Box>
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+            </Box>
           </Paper>
         </Container>
       </Box>
+
+      <FloatingCompareButton count={compareSpaces.length} />
     </>
   );
 }

@@ -68,21 +68,21 @@ function getPredictedBestTime(
   const shade = space.shade;
 
   if (activity === 'study') {
-    if (noiseDb <= 50) return '9am–11am';
-    if (noiseDb <= 60) return '8am–10am';
-    if (noiseDb <= 70) return '7am–9am';
+    if (noiseDb <= 50) return '9am-11am';
+    if (noiseDb <= 60) return '8am-10am';
+    if (noiseDb <= 70) return '7am-9am';
     return 'before 8am';
   }
 
   if (activity === 'remote work') {
-    if (comfort >= 80) return '10am–1pm';
-    if (comfort >= 65) return '9am–12pm';
-    if (comfort >= 50) return '8am–10am';
+    if (comfort >= 80) return '10am-1pm';
+    if (comfort >= 65) return '9am-12pm';
+    if (comfort >= 50) return '8am-10am';
     return 'before 9am';
   }
 
   if (shade >= 70) return 'after 4pm';
-  if (shade >= 50) return '3pm–5pm';
+  if (shade >= 50) return '3pm-5pm';
   return 'before 10am or after 5pm';
 }
 
@@ -501,7 +501,7 @@ export default function SpaceCard({
       >
         <Button
           component={Link}
-          href="/discover"
+          href={`/discover?spaceId=${space.id}`}
           endIcon={<ArrowForwardRoundedIcon />}
           sx={{
             px: 2.4,
