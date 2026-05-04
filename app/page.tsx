@@ -108,24 +108,24 @@ function StatCard({
     <Paper
       elevation={0}
       sx={{
-        p: 2.4,
-        borderRadius: '18px',
+        p: 1.8,
+        borderRadius: '16px',
         border: '1px solid #e5e7eb',
         bgcolor: '#f8fafc',
-        minHeight: 108,
+        minHeight: 88,
         transition: 'transform 0.24s ease, box-shadow 0.24s ease',
         '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: '0 14px 30px rgba(15,23,42,0.08)',
+          transform: 'translateY(-3px)',
+          boxShadow: '0 12px 24px rgba(15,23,42,0.07)',
         },
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.4 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.1 }}>
         <Box
           sx={{
-            width: 42,
-            height: 42,
-            borderRadius: '12px',
+            width: 36,
+            height: 36,
+            borderRadius: '10px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -133,7 +133,7 @@ function StatCard({
             color: '#15803d',
             flexShrink: 0,
             '& .MuiSvgIcon-root': {
-              fontSize: 22,
+              fontSize: 20,
               display: 'block',
             },
           }}
@@ -145,15 +145,25 @@ function StatCard({
           <Typography
             sx={{
               fontSize: '0.72rem',
-              fontWeight: 800,
-              letterSpacing: '0.08em',
+              fontWeight: 900,
               textTransform: 'uppercase',
+              letterSpacing: '0.12em',
               color: '#64748b',
+              lineHeight: 1.2,
+              mb: 0.3,
             }}
           >
             {label}
           </Typography>
-          <Typography sx={{ fontSize: '1.7rem', fontWeight: 900, color: '#0f172a' }}>
+
+          <Typography
+            sx={{
+              fontSize: '1.05rem',
+              fontWeight: 900,
+              color: '#0f172a',
+              lineHeight: 1,
+            }}
+          >
             {value}
           </Typography>
         </Box>
@@ -179,6 +189,15 @@ function NoiseDialCard({
 }) {
   const minDb = 45;
   const maxDb = 80;
+
+  function getNoiseColor(db: number) {
+    if (db <= 50) return '#22c55e'; // green
+    if (db <= 60) return '#eab308'; // yellow
+    if (db <= 70) return '#f97316'; // orange
+    return '#ef4444'; // red
+  }
+
+  const noiseColor = getNoiseColor(threshold);
 
   const size = 190;
   const dynamicStroke = 8 + ((threshold - minDb) / (maxDb - minDb)) * 14;
@@ -265,14 +284,15 @@ function NoiseDialCard({
               cy={size / 2}
               r={radius}
               fill="none"
-              stroke="#5850ec"
+              stroke={noiseColor}
               strokeWidth={stroke}
               strokeLinecap="round"
               strokeDasharray={circumference}
               strokeDashoffset={dashOffset}
               transform={`rotate(-90 ${size / 2} ${size / 2})`}
               style={{
-                transition: 'stroke-dashoffset 0.18s ease, stroke-width 0.18s ease',
+                transition:
+                  'stroke 0.35s ease, stroke-dashoffset 0.18s ease, stroke-width 0.18s ease',
               }}
             />
           </svg>
@@ -306,7 +326,8 @@ function NoiseDialCard({
                   fontSize: '1.9rem',
                   lineHeight: 1,
                   fontWeight: 900,
-                  color: '#0f172a',
+                  color: noiseColor,
+                  transition: 'color 0.35s ease',
                 }}
               >
                 {threshold} dB
@@ -317,7 +338,8 @@ function NoiseDialCard({
                   mt: 0.7,
                   fontSize: '1rem',
                   fontWeight: 800,
-                  color: '#5850ec',
+                  color: noiseColor,
+                  transition: 'color 0.35s ease',
                 }}
               >
                 {loading ? '—' : `${matchedCount} places`}
@@ -364,12 +386,16 @@ function NoiseDialCard({
                     textTransform: 'none',
                     fontWeight: 800,
                     fontSize: '0.95rem',
-                    bgcolor: activeSpaceId === space.id ? '#5850ec' : 'transparent',
+                    bgcolor: activeSpaceId === space.id ? noiseColor : 'transparent',
                     color: activeSpaceId === space.id ? '#fff' : '#334155',
-                    borderColor: 'rgba(88,80,236,0.32)',
+                    borderColor: alpha(noiseColor, 0.32),
+                    transition: 'all 0.35s ease',
                     '&:hover': {
-                      bgcolor: activeSpaceId === space.id ? '#4e46df' : '#f8f7ff',
-                      borderColor: '#5850ec',
+                      bgcolor:
+                        activeSpaceId === space.id
+                          ? noiseColor
+                          : alpha(noiseColor, 0.06),
+                      borderColor: noiseColor,
                     },
                   }}
                 >
@@ -391,7 +417,8 @@ function NoiseDialCard({
                     sx={{
                       fontSize: '0.9rem',
                       fontWeight: 900,
-                      color: activeSpaceId === space.id ? '#fff' : '#5850ec',
+                      color: activeSpaceId === space.id ? '#fff' : noiseColor,
+                      transition: 'color 0.35s ease',
                       flexShrink: 0,
                     }}
                   >
@@ -448,58 +475,56 @@ function HomeNoiseCard({
   }
 
   function MetricBox({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: 2.2,
-        borderRadius: '22px',
-        bgcolor: '#f8fafc',
-        border: '1px solid #e5e7eb',
-        minHeight: 140,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-      }}
-    >
-      <Typography
+    label,
+    value,
+  }: {
+    label: string;
+    value: string;
+  }) {
+    return (
+      <Paper
+        elevation={0}
         sx={{
-          fontSize: '0.76rem',
-          fontWeight: 900,
-          textTransform: 'uppercase',
-          letterSpacing: '0.14em',
-          color: '#64748b',
-          fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+          p: 2,
+          borderRadius: '22px',
+          bgcolor: '#f8fafc',
+          border: '1px solid #e5e7eb',
+          minHeight: 128,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
         }}
       >
-        {label}
-      </Typography>
-
-      <Typography
-        sx={{
-          fontSize: { xs: '2.2rem', md: '2.9rem' },
-          lineHeight: 0.95,
-          fontWeight: 950,
-          letterSpacing: '-0.06em',
-          color: '#0f172a',
-          wordBreak: 'break-word',
-          fontFamily:
-            '"Arial Black", "Inter", "Helvetica Neue", Arial, sans-serif',
-          transform: 'skewX(-2deg)',
-          textShadow: '0 1px 0 rgba(255,255,255,0.4)',
-        }}
-      >
-        {value}
-      </Typography>
-    </Paper>
-  );
-}
+        <Typography
+  sx={{
+    fontSize: '0.92rem',
+    fontWeight: 900,
+    textTransform: 'uppercase',
+    letterSpacing: '0.12em',
+    color: '#64748b',
+    fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+  }}
+>
+  {label}
+</Typography>
+  
+        <Typography
+          sx={{
+            fontSize: { xs: '1.7rem', md: '2rem' },
+            lineHeight: 1,
+            fontWeight: 900,
+            letterSpacing: '-0.04em',
+            color: '#0f172a',
+            wordBreak: 'break-word',
+            fontFamily:
+              '"Arial Black", "Inter", "Helvetica Neue", Arial, sans-serif',
+          }}
+        >
+          {value}
+        </Typography>
+      </Paper>
+    );
+  }
 
   return (
     <Paper
