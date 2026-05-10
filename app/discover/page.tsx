@@ -28,6 +28,16 @@ type SearchCenter = {
   label: string;
 };
 
+type LocationPoint = {
+  latitude: number;
+  longitude: number;
+};
+
+const MELBOURNE_CBD_CENTER: LocationPoint = {
+  latitude: -37.8136,
+  longitude: 144.9631,
+};
+
 function getSpaceLatitude(space: Space) {
   return Number(space.latitude);
 }
@@ -43,10 +53,7 @@ function hasValidCoordinates(space: Space) {
   );
 }
 
-function getDistanceKm(
-  from: { latitude: number; longitude: number },
-  to: { latitude: number; longitude: number }
-) {
+function getDistanceKm(from: LocationPoint, to: LocationPoint) {
   const earthRadiusKm = 6371;
 
   const dLat = ((to.latitude - from.latitude) * Math.PI) / 180;
@@ -67,6 +74,7 @@ function getDistanceKm(
   return earthRadiusKm * c;
 }
 
+
 function getBestScore(space: Space) {
   return (100 - space.noiseDb) * 0.45 + space.comfort * 0.35 + space.shade * 0.2;
 }
@@ -81,6 +89,7 @@ function DiscoverPageContent() {
   const [activity, setActivity] = React.useState<ActivityType>('study');
   const [sortBy, setSortBy] = React.useState<SortType>('best');
   const [searchCenter, setSearchCenter] = React.useState<SearchCenter | null>(null);
+  const [userLocation, setUserLocation] = React.useState<LocationPoint | null>(null);
 
   const [hasAppliedFilters, setHasAppliedFilters] = React.useState(false);
 
@@ -219,11 +228,31 @@ function DiscoverPageContent() {
     }
   }
 
-  const filteredSpaces = React.useMemo(() => {
-    if (!hasAppliedFilters) {
-      return spaces;
+  React.useEffect(() => {
+    if (!navigator.geolocation) {
+      return;
     }
   
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      (error) => {
+        console.warn('Unable to get user location:', error);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  }, []);
+
+
+  const filteredSpaces = React.useMemo(() => {
     const keyword = search.trim().toLowerCase();
     let result = [...spaces];
   
@@ -317,6 +346,26 @@ function DiscoverPageContent() {
       });
     }
   
+  
+
+const distanceCenter = searchCenter ?? userLocation ?? MELBOURNE_CBD_CENTER;
+
+result = result.map((space) => {
+  if (!hasValidCoordinates(space)) {
+    return space;
+  }
+
+  const distance = getDistanceKm(distanceCenter, {
+    latitude: getSpaceLatitude(space),
+    longitude: getSpaceLongitude(space),
+  });
+
+  return {
+    ...space,
+    distance: Number(distance.toFixed(2)),
+  };
+});
+    
     if (sortBy === 'distance') {
       if (searchCenter) {
         result.sort((a, b) => {
@@ -354,6 +403,7 @@ function DiscoverPageContent() {
     spaces,
     search,
     searchCenter,
+    userLocation,
     category,
     activity,
     sortBy,
@@ -409,12 +459,12 @@ function DiscoverPageContent() {
   return (
     <>
       <AppNavbar />
-
+  
       <Box
         sx={{
           minHeight: '100vh',
-          background:
-            'radial-gradient(circle at top left, rgba(79,70,229,0.08), transparent 26%), radial-gradient(circle at top right, rgba(14,165,233,0.06), transparent 20%), linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)',
+          bgcolor: '#f5efe2',
+          color: '#273d34',
           py: { xs: 3, md: 5 },
         }}
       >
@@ -422,62 +472,134 @@ function DiscoverPageContent() {
           <Paper
             elevation={0}
             sx={{
-              p: { xs: 3, md: 4 },
-              borderRadius: '32px',
-              bgcolor: 'rgba(255,255,255,0.62)',
-              backdropFilter: 'blur(10px)',
-              boxShadow: '0 16px 50px rgba(15, 23, 42, 0.06)',
-              border: '1px solid rgba(255,255,255,0.72)',
+              p: { xs: 2.5, md: 4 },
+              borderRadius: '28px',
+              bgcolor: '#fbf7ed',
+              border: '1px solid #ded2bd',
+              boxShadow: '0 18px 40px rgba(87, 72, 48, 0.12)',
             }}
           >
             <Typography
-              sx={{ fontSize: { xs: '2rem', md: '3rem' }, fontWeight: 900, mb: 1 }}
+              sx={{
+                fontSize: { xs: '2.4rem', md: '3.4rem' },
+                fontWeight: 900,
+                mb: 1,
+                color: '#273d34',
+                fontFamily: 'Georgia, serif',
+                letterSpacing: '-0.04em',
+              }}
             >
               Discover spaces
             </Typography>
-
-            <Typography color="text.secondary" sx={{ mb: 3 }}>
+  
+            <Typography
+              sx={{
+                mb: 3,
+                color: '#52645d',
+                fontSize: '1.02rem',
+              }}
+            >
               Search, filter, and explore all matching spaces across Melbourne.
             </Typography>
-
-            <FilterPanel
-  search={search}
-  category={category}
-  activity={activity}
-  sortBy={sortBy}
-  onSearchChange={setSearch}
-  onCategoryChange={setCategory}
-  onActivityChange={setActivity}
-  onSortChange={setSortBy}
-  onApply={handleApplyFilters}
-  onReset={() => {
-    setSearch('');
-    setSearchCenter(null);
-    setCategory('all');
-    setActivity('study');
-    setSortBy('best');
-    setHasAppliedFilters(false);
-    setSelectedSpaceId(null);
-  }}
-/>
-
-            <Grid container spacing={3} sx={{ mt: 1 }}>
+  
+            <Box
+              sx={{
+                '& form': {
+                  bgcolor: '#fffaf1 !important',
+                  border: '1px solid #ded2bd !important',
+                  boxShadow: '0 10px 28px rgba(87, 72, 48, 0.08) !important',
+                },
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: '#fffaf1 !important',
+                  borderRadius: '12px !important',
+                },
+                '& .MuiButton-contained': {
+                  bgcolor: '#2d4a3d !important',
+                  color: '#ffffff !important',
+                  boxShadow: 'none !important',
+                },
+                '& .MuiButton-outlined': {
+                  color: '#273d34 !important',
+                  borderColor: '#d8c9ae !important',
+                  bgcolor: '#fffaf1 !important',
+                },
+              }}
+            >
+              <FilterPanel
+                search={search}
+                category={category}
+                activity={activity}
+                sortBy={sortBy}
+                onSearchChange={setSearch}
+                onCategoryChange={setCategory}
+                onActivityChange={setActivity}
+                onSortChange={setSortBy}
+                onApply={() => setHasAppliedFilters(true)}
+                onReset={() => setHasAppliedFilters(false)}
+              />
+            </Box>
+  
+            <Grid container spacing={3} sx={{ mt: 3 }}>
               <Grid size={{ xs: 12, lg: 8 }}>
-                <MapPlaceholder
-                  spaces={filteredSpaces}
-                  selectedSpaceId={selectedSpaceId}
-                  onSelectSpace={setSelectedSpaceId}
-                />
-
+                <Paper
+                  elevation={0}
+                  sx={{
+                    position: 'relative',
+                    overflow: 'hidden',
+                    borderRadius: '18px',
+                    border: '1px solid #ded2bd',
+                    bgcolor: '#eee6d8',
+                    boxShadow: '0 18px 40px rgba(87, 72, 48, 0.1)',
+                    '& .mapboxgl-map, & .leaflet-container': {
+                      borderRadius: '18px',
+                    },
+                  }}
+                >
+                  <MapPlaceholder
+                    spaces={filteredSpaces}
+                    selectedSpaceId={selectedSpaceId}
+                    onSelectSpace={setSelectedSpaceId}
+                  />
+  
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      position: { xs: 'static', md: 'absolute' },
+                      right: 22,
+                      top: 22,
+                      zIndex: 10,
+                      m: { xs: 2, md: 0 },
+                      maxWidth: 280,
+                      p: 1.6,
+                      borderRadius: '10px',
+                      bgcolor: '#fffaf1',
+                      border: '1px solid #ded2bd',
+                      boxShadow: '0 8px 24px rgba(87, 72, 48, 0.12)',
+                      display: { xs: 'none', md: 'block' },
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        color: '#52645d',
+                        fontSize: 14,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      Explore recommended places by activity, comfort, and nearby
+                      walking distance.
+                    </Typography>
+                  </Paper>
+                </Paper>
+  
                 <Paper
                   elevation={0}
                   sx={{
                     mt: 3,
                     p: 2,
-                    borderRadius: '18px',
-                    border: '1px solid #dbe1e8',
-                    bgcolor: '#ffffff',
-                    boxShadow: '0 12px 30px rgba(15,23,42,0.05)',
+                    borderRadius: '14px',
+                    border: '1px solid #ded2bd',
+                    bgcolor: '#fbf7ed',
+                    boxShadow: '0 12px 30px rgba(87, 72, 48, 0.08)',
                   }}
                 >
                   <Box
@@ -494,17 +616,17 @@ function DiscoverPageContent() {
                         sx={{
                           fontSize: '0.8rem',
                           fontWeight: 900,
-                          letterSpacing: '0.12em',
+                          letterSpacing: '0.18em',
                           textTransform: 'uppercase',
-                          color: '#5850ec',
-                          mb: 0.6,
+                          color: '#9a8f7e',
+                          mb: 0.8,
                         }}
                       >
                         Compare list
                       </Typography>
-
+  
                       {compareSpaces.length === 0 ? (
-                        <Typography color="text.secondary">
+                        <Typography sx={{ color: '#52645d' }}>
                           Select up to 2 spaces to compare.
                         </Typography>
                       ) : (
@@ -516,16 +638,23 @@ function DiscoverPageContent() {
                               onDelete={() => handleRemoveFromCompare(item.name)}
                               sx={{
                                 borderRadius: '999px',
-                                bgcolor: '#f1efff',
-                                color: '#4f46e5',
+                                bgcolor: '#eee6d8',
+                                color: '#273d34',
+                                border: '1px solid #d8c9ae',
                                 fontWeight: 800,
+                                '& .MuiChip-deleteIcon': {
+                                  color: '#9a8f7e',
+                                  '&:hover': {
+                                    color: '#c9775c',
+                                  },
+                                },
                               }}
                             />
                           ))}
                         </Box>
                       )}
                     </Box>
-
+  
                     <Box sx={{ display: 'flex', gap: 1.2, flexWrap: 'wrap' }}>
                       {compareSpaces.length > 0 && (
                         <Button
@@ -536,13 +665,20 @@ function DiscoverPageContent() {
                             borderRadius: '999px',
                             px: 2.2,
                             textTransform: 'none',
-                            fontWeight: 800,
+                            fontWeight: 900,
+                            color: '#273d34',
+                            borderColor: '#d8c9ae',
+                            bgcolor: '#fffaf1',
+                            '&:hover': {
+                              borderColor: '#cdbb9b',
+                              bgcolor: '#f7efdf',
+                            },
                           }}
                         >
                           Clear
                         </Button>
                       )}
-
+  
                       <Button
                         onClick={handleGoToCompare}
                         disabled={compareSpaces.length < 2}
@@ -552,15 +688,16 @@ function DiscoverPageContent() {
                           borderRadius: '999px',
                           px: 2.4,
                           textTransform: 'none',
-                          fontWeight: 800,
-                          bgcolor: '#5850ec',
-                          boxShadow: '0 10px 20px rgba(88,80,236,0.25)',
+                          fontWeight: 900,
+                          bgcolor: '#2d4a3d',
+                          color: '#ffffff',
+                          boxShadow: '0 10px 22px rgba(45, 74, 61, 0.18)',
                           '&:hover': {
-                            bgcolor: '#4e46df',
+                            bgcolor: '#263f35',
                           },
                           '&.Mui-disabled': {
-                            bgcolor: '#c7c4ff',
-                            color: '#fff',
+                            bgcolor: '#d8d0bf',
+                            color: '#fffaf1',
                           },
                         }}
                       >
@@ -570,78 +707,139 @@ function DiscoverPageContent() {
                   </Box>
                 </Paper>
               </Grid>
-
+  
               <Grid size={{ xs: 12, lg: 4 }}>
-                <Box
+                <Paper
+                  elevation={0}
                   sx={{
                     p: 3,
-                    borderRadius: '32px',
-                    bgcolor: 'white',
-                    boxShadow: '0 12px 40px rgba(15, 23, 42, 0.08)',
+                    borderRadius: '14px',
+                    bgcolor: '#fbf7ed',
+                    border: '1px solid #ded2bd',
+                    boxShadow: '0 18px 40px rgba(87, 72, 48, 0.1)',
                     mb: 3,
                   }}
                 >
-                  <Typography sx={{ fontSize: '2rem', fontWeight: 900, mb: 1 }}>
+                  <Typography
+                    sx={{
+                      fontSize: '2rem',
+                      fontWeight: 900,
+                      mb: 1,
+                      color: '#273d34',
+                      fontFamily: 'Georgia, serif',
+                    }}
+                  >
                     Why these places?
                   </Typography>
-
-                  <Typography color="text.secondary" sx={{ mb: 2 }}>
-                    Recommendations combine noise level, comfort score, shade, distance,
-                    and activity suitability.
+  
+                  <Typography
+                    sx={{
+                      color: '#52645d',
+                      lineHeight: 1.65,
+                    }}
+                  >
+                    Recommendations combine noise level, comfort score, shade,
+                    distance, and activity suitability.
                   </Typography>
-                </Box>
-
-                <Box
+                </Paper>
+  
+                <Paper
+                  elevation={0}
                   sx={{
                     p: 3,
-                    borderRadius: '32px',
-                    bgcolor: 'white',
-                    boxShadow: '0 12px 40px rgba(15, 23, 42, 0.08)',
+                    borderRadius: '14px',
+                    bgcolor: '#fbf7ed',
+                    border: '1px solid #ded2bd',
+                    boxShadow: '0 18px 40px rgba(87, 72, 48, 0.1)',
                   }}
                 >
-                  <Typography sx={{ fontSize: '2rem', fontWeight: 900, mb: 1 }}>
+                  <Typography
+                    sx={{
+                      fontSize: '2rem',
+                      fontWeight: 900,
+                      mb: 1,
+                      color: '#273d34',
+                      fontFamily: 'Georgia, serif',
+                    }}
+                  >
                     Quick insight
                   </Typography>
-
-                  <Typography color="text.secondary">
+  
+                  <Typography sx={{ color: '#52645d' }}>
                     Best experience now:{' '}
-                    <strong>
+                    <Box
+                      component="span"
+                      sx={{
+                        fontWeight: 900,
+                        color: '#273d34',
+                      }}
+                    >
                       {filteredSpaces[0]?.name ?? spaces[0]?.name ?? 'No result'}
-                    </strong>
+                    </Box>
                   </Typography>
-                </Box>
+                </Paper>
               </Grid>
             </Grid>
-
-            <Box sx={{ mt: 4 }}>
+  
+            <Box sx={{ mt: 5 }}>
               <Typography
-                sx={{ fontSize: { xs: '2rem', md: '3rem' }, fontWeight: 900, mb: 1 }}
+                sx={{
+                  fontSize: { xs: '2.2rem', md: '3.2rem' },
+                  fontWeight: 900,
+                  mb: 1,
+                  color: '#273d34',
+                  fontFamily: 'Georgia, serif',
+                  letterSpacing: '-0.04em',
+                }}
               >
                 All matching spaces
               </Typography>
-
-              <Typography color="text.secondary" sx={{ mb: 3 }}>
+  
+              <Typography
+                sx={{
+                  color: '#52645d',
+                  mb: 3,
+                }}
+              >
                 Browse every result that matches your selected filters.
               </Typography>
-
+  
               {error ? (
-                <Box sx={{ color: 'error.main' }}>{error}</Box>
+                <Box sx={{ color: '#b42318', fontWeight: 800 }}>{error}</Box>
               ) : isLoading ? (
-                <Box>Loading spaces...</Box>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    borderRadius: '14px',
+                    border: '1px solid #ded2bd',
+                    bgcolor: '#fffaf1',
+                  }}
+                >
+                  Loading spaces...
+                </Paper>
               ) : filteredSpaces.length === 0 ? (
                 <Paper
                   elevation={0}
                   sx={{
                     p: 3,
-                    borderRadius: '24px',
-                    border: '1px solid #e5e7eb',
-                    bgcolor: '#ffffff',
+                    borderRadius: '14px',
+                    border: '1px solid #ded2bd',
+                    bgcolor: '#fffaf1',
                   }}
                 >
-                  <Typography sx={{ fontSize: '1.4rem', fontWeight: 900 }}>
+                  <Typography
+                    sx={{
+                      fontSize: '1.4rem',
+                      fontWeight: 900,
+                      color: '#273d34',
+                      fontFamily: 'Georgia, serif',
+                    }}
+                  >
                     No matching spaces
                   </Typography>
-                  <Typography color="text.secondary" sx={{ mt: 1 }}>
+  
+                  <Typography sx={{ color: '#52645d', mt: 1 }}>
                     Try a different keyword or adjust your filters.
                   </Typography>
                 </Paper>
@@ -651,18 +849,32 @@ function DiscoverPageContent() {
                     <Grid key={space.id} size={{ xs: 12, md: 6, xl: 4 }}>
                       <Box
                         onClick={() => setSelectedSpaceId(space.id)}
-                        sx={{ cursor: 'pointer' }}
+                        sx={{
+                          cursor: 'pointer',
+                          '& > *': {
+                            borderColor:
+                              selectedSpaceId === space.id
+                                ? '#c9775c !important'
+                                : undefined,
+                            boxShadow:
+                              selectedSpaceId === space.id
+                                ? '0 18px 40px rgba(201, 119, 92, 0.18) !important'
+                                : undefined,
+                          },
+                        }}
                       >
                         <SpaceCard
-  space={space}
-  rank={index + 1}
-  selected={selectedSpaceId === space.id}
-  onSelect={(selectedSpace) => setSelectedSpaceId(selectedSpace.id)}
-  onAddToCompare={handleAddToCompare}
-  isCompared={compareSpaces.some(
-    (item) => item.name === space.name
-  )}
-/>
+                          space={space}
+                          rank={index + 1}
+                          selected={selectedSpaceId === space.id}
+                          onSelect={(selectedSpace) =>
+                            setSelectedSpaceId(selectedSpace.id)
+                          }
+                          onAddToCompare={handleAddToCompare}
+                          isCompared={compareSpaces.some(
+                            (item) => item.name === space.name
+                          )}
+                        />
                       </Box>
                     </Grid>
                   ))}
@@ -672,7 +884,7 @@ function DiscoverPageContent() {
           </Paper>
         </Container>
       </Box>
-
+  
       <FloatingCompareButton count={compareSpaces.length} />
     </>
   );
@@ -685,8 +897,7 @@ function DiscoverPageFallback() {
       <Box
         sx={{
           minHeight: '100vh',
-          background:
-            'radial-gradient(circle at top left, rgba(79,70,229,0.08), transparent 26%), radial-gradient(circle at top right, rgba(14,165,233,0.06), transparent 20%), linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)',
+          bgcolor: '#f5efe2',
           py: { xs: 3, md: 5 },
         }}
       >
@@ -695,15 +906,19 @@ function DiscoverPageFallback() {
             elevation={0}
             sx={{
               p: { xs: 3, md: 4 },
-              borderRadius: '32px',
-              bgcolor: 'rgba(255,255,255,0.62)',
-              backdropFilter: 'blur(10px)',
-              boxShadow: '0 16px 50px rgba(15, 23, 42, 0.06)',
-              border: '1px solid rgba(255,255,255,0.72)',
+              borderRadius: '28px',
+              bgcolor: '#fbf7ed',
+              border: '1px solid #ded2bd',
+              boxShadow: '0 18px 40px rgba(87, 72, 48, 0.12)',
             }}
           >
             <Typography
-              sx={{ fontSize: { xs: '2rem', md: '3rem' }, fontWeight: 900 }}
+              sx={{
+                fontSize: { xs: '2rem', md: '3rem' },
+                fontWeight: 900,
+                color: '#273d34',
+                fontFamily: 'Georgia, serif',
+              }}
             >
               Loading discover spaces...
             </Typography>

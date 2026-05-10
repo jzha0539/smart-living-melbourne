@@ -19,16 +19,16 @@ const RLPolyline = Polyline as any;
 const RLCircleMarker = CircleMarker as any;
 const RLPopup = Popup as any;
 
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+
 function FitBounds({
   route,
   start,
   end,
-  userLocation,
 }: {
   route: LatLng[];
   start: LatLng | null;
   end: LatLng | null;
-  userLocation: LatLng | null;
 }) {
   const map = useMap();
 
@@ -39,18 +39,10 @@ function FitBounds({
 
     if (points.length > 1) {
       map.fitBounds(points, { padding: [40, 40] });
-      return;
-    }
-
-    if (points.length === 1) {
+    } else if (points.length === 1) {
       map.setView(points[0], 14);
-      return;
     }
-
-    if (userLocation) {
-      map.setView(userLocation, 15);
-    }
-  }, [map, route, start, end, userLocation]);
+  }, [map, route, start, end]);
 
   return null;
 }
@@ -68,70 +60,27 @@ export default function RouteMap({
   destinationName: string;
   fallbackCenter: LatLng;
 }) {
-  const [userLocation, setUserLocation] = React.useState<LatLng | null>(null);
-
-  React.useEffect(() => {
-    if (startPoint) {
-      return;
-    }
-
-    if (!navigator.geolocation) {
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const location: LatLng = [
-          position.coords.latitude,
-          position.coords.longitude,
-        ];
-
-        setUserLocation(location);
-      },
-      (error) => {
-        console.warn('Unable to get current location:', error);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000,
-      }
-    );
-  }, [startPoint]);
-
-  const mapCenter = startPoint ?? userLocation ?? fallbackCenter;
+  const mapboxTileUrl = MAPBOX_TOKEN
+  ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`
+  : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
   return (
     <RLMapContainer
-      center={mapCenter}
+      center={startPoint ?? fallbackCenter}
       zoom={14}
       style={{ height: '100%', width: '100%' }}
     >
       <RLTileLayer
-        attribution="&copy; OpenStreetMap contributors"
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+  attribution={
+    MAPBOX_TOKEN
+      ? '&copy; Mapbox &copy; OpenStreetMap'
+      : '&copy; OpenStreetMap contributors'
+  }
+  url={mapboxTileUrl}
+  maxZoom={20}
+/>
 
-      <FitBounds
-        route={routeLine}
-        start={startPoint}
-        end={endPoint}
-        userLocation={userLocation}
-      />
-
-      {userLocation && !startPoint && (
-        <RLCircleMarker
-          center={userLocation}
-          radius={10}
-          pathOptions={{
-            color: '#2563eb',
-            fillColor: '#2563eb',
-            fillOpacity: 0.9,
-          }}
-        >
-          <RLPopup>Your current location</RLPopup>
-        </RLCircleMarker>
-      )}
+      <FitBounds route={routeLine} start={startPoint} end={endPoint} />
 
       {startPoint && (
         <RLCircleMarker
