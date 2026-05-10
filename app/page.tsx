@@ -915,7 +915,7 @@ export default function HomePage() {
   }, [recommendedSpaces, activeNoiseSpaceId]);
 
   const noiseThreshold = React.useMemo(() => {
-    return Math.max(30, Math.min(80, Math.round(85 - rankingWeights.quietness * 0.35)));
+    return Math.max(30, Math.min(80, Math.round(85 - rankingWeights.quietness * 0.55)));
   }, [rankingWeights.quietness]);
 
   const noiseRingDegrees = React.useMemo(() => {
@@ -945,6 +945,16 @@ export default function HomePage() {
 
     return 'Quietness is relaxed — recommendations can include busier lifestyle locations.';
   }, [noiseThreshold]);
+
+  function getNoiseRingColor(noise: number) {
+  if (noise < 50) return '#2DBE63';
+  if (noise < 65) return '#E8B100';
+  return '#E06D3A';
+}
+
+const noiseRingColor = getNoiseRingColor(noiseThreshold);
+const visibleNoiseRingDegrees =
+  noiseRingDegrees <= 0 ? 0 : Math.min(360, noiseRingDegrees + 0.8);
 
   return (
     <>
@@ -1855,7 +1865,15 @@ export default function HomePage() {
                       mx: 'auto',
                       my: { xs: 3, md: 4 },
                       borderRadius: '50%',
-                      background: `conic-gradient(#E06D3A 0deg ${noiseRingDegrees}deg, #DDE1D6 ${noiseRingDegrees}deg 360deg)`,
+                      background:
+  noiseRingDegrees <= 0
+    ? '#DDE1D6'
+    : noiseRingDegrees >= 359
+      ? noiseRingColor
+      : `conic-gradient(
+          ${noiseRingColor} 0deg ${visibleNoiseRingDegrees}deg,
+          #DDE1D6 ${visibleNoiseRingDegrees}deg 360deg
+        )`,
                       display: 'grid',
                       placeItems: 'center',
                       transition: 'background 0.25s ease',
@@ -1891,14 +1909,14 @@ export default function HomePage() {
                             fontFamily: 'Georgia, "Times New Roman", serif',
                             fontSize: '2.4rem',
                             fontWeight: 700,
-                            color: '#D8845F',
+                            color: noiseRingColor,
                             lineHeight: 1,
                           }}
                         >
                           {noiseThreshold} dB
                         </Typography>
 
-                        <Typography sx={{ mt: 0.6, color: '#D8845F', fontWeight: 800 }}>
+                        <Typography sx={{ mt: 0.6, color: noiseRingColor, fontWeight: 800 }}>
                           {loading ? '—' : `${rankedSpaces.length} ranked places`}
                         </Typography>
                       </Box>
@@ -1934,7 +1952,17 @@ export default function HomePage() {
                       ['80 dB', 'Busy street'],
                     ].map(([db, label]) => {
                       const value = Number(db.replace(' dB', ''));
-                      const active = Math.abs(value - noiseThreshold) <= 5;
+
+function getActiveNoiseLevel(noise: number) {
+  if (noise < 35) return 30;
+  if (noise < 45) return 40;
+  if (noise < 55) return 50;
+  if (noise < 65) return 60;
+  if (noise < 75) return 70;
+  return 80;
+}
+
+const active = value === getActiveNoiseLevel(noiseThreshold);
 
                       return (
                         <Box

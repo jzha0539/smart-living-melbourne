@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import {
   Box,
   Button,
-  Chip,
   Container,
   Paper,
   Typography,
@@ -15,242 +14,254 @@ import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import AppNavbar from '../../components/AppNavbar';
 import { Space } from '../../types/space';
 
-function getCompareImage(space: Space) {
-  const name = space.name.toLowerCase();
-  const category = space.category.toLowerCase();
+function toNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
 
-  if (name.includes('birrarung')) return '/images/birrarung.jpg';
-  if (name.includes('enterprize') || name.includes('enterprise')) return '/images/enterprize.jpg';
-  if (name.includes('skyfarm') || name.includes('mcec')) return '/images/skyfarm.jpg';
-  if (name.includes('ch1')) return '/images/rooftop.jpg';
-  if (name.includes('101 collins')) return '/images/rooftop.jpg';
-  if (name.includes('treasury')) return '/images/lounge.jpg';
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
 
-  if (category.includes('park')) return '/images/park.jpg';
-  if (category.includes('rooftop')) return '/images/rooftop.jpg';
-  if (category.includes('library')) return '/images/library.jpg';
-  if (category.includes('public lounge')) return '/images/lounge.jpg';
+  return null;
+}
 
-  return '/images/1.jpg';
+function getNoiseValue(space: Space) {
+  return toNumber(space.noiseDb) ?? 55;
+}
+
+function getComfortValue(space: Space) {
+  return toNumber(space.comfort) ?? 70;
+}
+
+function getShadeValue(space: Space) {
+  const directShade = toNumber(space.shade);
+
+  if (directShade !== null) {
+    return Math.round(Math.max(0, Math.min(100, directShade)));
+  }
+
+  const category = String(space.category ?? '').toLowerCase();
+  const name = String(space.name ?? '').toLowerCase();
+  const comfort = getComfortValue(space);
+
+  if (
+    category.includes('park') ||
+    category.includes('garden') ||
+    category.includes('leisure') ||
+    category.includes('reserve') ||
+    category.includes('trail') ||
+    category.includes('river') ||
+    name.includes('park') ||
+    name.includes('garden') ||
+    name.includes('reserve') ||
+    name.includes('trail') ||
+    name.includes('river')
+  ) {
+    return Math.round(Math.min(100, comfort + 12));
+  }
+
+  if (
+    category.includes('library') ||
+    category.includes('book') ||
+    category.includes('indoor') ||
+    name.includes('library') ||
+    name.includes('book')
+  ) {
+    return Math.round(Math.min(100, comfort + 4));
+  }
+
+  return Math.round(Math.max(0, Math.min(100, comfort)));
 }
 
 function getPredictedBestTime(
   space: Space,
   activity: 'study' | 'remote work' | 'relax' = 'study'
 ) {
-  const noiseDb = space.noiseDb;
-  const comfort = space.comfort;
-  const shade = space.shade;
+  const noiseDb = getNoiseValue(space);
+  const comfort = getComfortValue(space);
+  const shade = getShadeValue(space);
 
   if (activity === 'study') {
-    if (noiseDb <= 50) return '9am–11am';
-    if (noiseDb <= 60) return '8am–10am';
-    if (noiseDb <= 70) return '7am–9am';
-    return 'before 8am';
+    if (noiseDb <= 50) return '9:00 AM - 11:00 AM';
+    if (noiseDb <= 60) return '8:00 AM - 10:00 AM';
+    if (noiseDb <= 70) return '7:00 AM - 9:00 AM';
+    return 'Before 8:00 AM';
   }
 
   if (activity === 'remote work') {
-    if (comfort >= 80) return '10am–1pm';
-    if (comfort >= 65) return '9am–12pm';
-    if (comfort >= 50) return '8am–10am';
-    return 'before 9am';
+    if (comfort >= 80) return '10:00 AM - 1:00 PM';
+    if (comfort >= 65) return '9:00 AM - 12:00 PM';
+    if (comfort >= 50) return '8:00 AM - 10:00 AM';
+    return 'Before 9:00 AM';
   }
 
-  if (shade >= 70) return 'after 4pm';
-  if (shade >= 50) return '3pm–5pm';
-  return 'before 10am or after 5pm';
+  if (shade >= 70) return 'After 4:00 PM';
+  if (shade >= 50) return '3:00 PM - 5:00 PM';
+  return 'Before 10:00 AM or after 5:00 PM';
 }
 
-function getBestTimeLabel(space: Space) {
-  return {
-    study: getPredictedBestTime(space, 'study'),
-    remoteWork: getPredictedBestTime(space, 'remote work'),
-    relax: getPredictedBestTime(space, 'relax'),
-  };
+function getCrowdLabel(space: Space) {
+  const noise = getNoiseValue(space);
+
+  if (noise <= 45) return 'Low';
+  if (noise <= 60) return 'Medium';
+  return 'High';
 }
 
-function getEstimatedWalkMinutes(space: Space) {
-  return Math.max(3, Math.round(space.distance * 12));
-}
+function getSerenityScore(space: Space) {
+  const noise = getNoiseValue(space);
+  const comfort = getComfortValue(space);
+  const shade = getShadeValue(space);
 
-function getRouteEfficiency(space: Space) {
-  const walk = getEstimatedWalkMinutes(space);
+  const noiseScore = Math.max(0, Math.min(100, 100 - noise));
+  const comfortScore = Math.max(0, Math.min(100, comfort));
+  const shadeScore = Math.max(0, Math.min(100, shade));
 
-  if (walk <= 8) return 'Very easy access';
-  if (walk <= 15) return 'Easy access';
-  if (walk <= 22) return 'Moderate access';
-  return 'Longer walk';
-}
-
-function generateNoiseTrend(space: Space) {
-  const base = space.noiseDb;
-  const activityBias = space.category.toLowerCase().includes('library') ? -4 : 0;
-
-  return Array.from({ length: 24 }, (_, hour) => {
-    let value = base + activityBias;
-
-    if (hour >= 7 && hour <= 9) value -= 6;
-    if (hour >= 10 && hour <= 13) value += 4;
-    if (hour >= 14 && hour <= 17) value += 8;
-    if (hour >= 18 && hour <= 20) value += 5;
-    if (hour >= 21 || hour <= 6) value -= 7;
-
-    value = Math.max(35, Math.min(90, Math.round(value)));
-    return { hour, value };
-  });
-}
-
-function generateComfortTrend(space: Space) {
-  const base = space.comfort;
-  const shadeBonus = space.shade >= 70 ? 6 : space.shade >= 50 ? 3 : 0;
-
-  return Array.from({ length: 24 }, (_, hour) => {
-    let value = base + shadeBonus;
-
-    if (hour >= 7 && hour <= 10) value += 5;
-    if (hour >= 11 && hour <= 14) value -= 6;
-    if (hour >= 15 && hour <= 17) value -= 2;
-    if (hour >= 18 && hour <= 20) value += 4;
-    if (hour >= 21 || hour <= 6) value -= 3;
-
-    value = Math.max(35, Math.min(100, Math.round(value)));
-    return { hour, value };
-  });
-}
-
-function MiniTrendChart({
-  title,
-  data,
-  min,
-  max,
-  suffix,
-}: {
-  title: string;
-  data: { hour: number; value: number }[];
-  min: number;
-  max: number;
-  suffix: string;
-}) {
-  const width = 100;
-  const height = 44;
-
-  const points = data
-    .map((item, index) => {
-      const x = (index / (data.length - 1)) * width;
-      const y = height - ((item.value - min) / (max - min)) * height;
-      return `${x},${y}`;
-    })
-    .join(' ');
-
-  const minValue = Math.min(...data.map((d) => d.value));
-  const maxValue = Math.max(...data.map((d) => d.value));
-
-  return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: 2,
-        borderRadius: '16px',
-        border: '1px solid #e5e7eb',
-        bgcolor: '#f8fafc',
-      }}
-    >
-      <Typography
-        sx={{
-          fontSize: '0.78rem',
-          fontWeight: 900,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: '#5850ec',
-          mb: 1.2,
-        }}
-      >
-        {title}
-      </Typography>
-
-      <Box sx={{ width: '100%', mb: 1 }}>
-        <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="72" preserveAspectRatio="none">
-          <polyline
-            fill="none"
-            stroke="#5850ec"
-            strokeWidth="2.5"
-            points={points}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-        </svg>
-      </Box>
-
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: '0.72rem',
-          color: '#64748b',
-          mb: 0.8,
-        }}
-      >
-        <span>0:00</span>
-        <span>12:00</span>
-        <span>24:00</span>
-      </Box>
-
-      <Typography sx={{ fontSize: '0.82rem', color: '#475569' }}>
-        Range: {minValue}
-        {suffix} – {maxValue}
-        {suffix}
-      </Typography>
-    </Paper>
+  return Math.round(
+    noiseScore * 0.4 +
+      comfortScore * 0.4 +
+      shadeScore * 0.2
   );
 }
 
-function MetricRow({
-  label,
-  left,
-  right,
+function getWinner(
+  label: string,
+  left: Space,
+  right: Space
+): 'left' | 'right' | 'tie' {
+  if (label === 'Noise') {
+    const leftNoise = getNoiseValue(left);
+    const rightNoise = getNoiseValue(right);
+
+    if (leftNoise < rightNoise) return 'left';
+    if (rightNoise < leftNoise) return 'right';
+    return 'tie';
+  }
+
+  if (label === 'Comfort') {
+    const leftComfort = getComfortValue(left);
+    const rightComfort = getComfortValue(right);
+
+    if (leftComfort > rightComfort) return 'left';
+    if (rightComfort > leftComfort) return 'right';
+    return 'tie';
+  }
+
+  if (label === 'Shade') {
+    const leftShade = getShadeValue(left);
+    const rightShade = getShadeValue(right);
+
+    if (leftShade > rightShade) return 'left';
+    if (rightShade > leftShade) return 'right';
+    return 'tie';
+  }
+
+  if (label === 'Serenity score') {
+    const leftScore = getSerenityScore(left);
+    const rightScore = getSerenityScore(right);
+
+    if (leftScore > rightScore) return 'left';
+    if (rightScore > leftScore) return 'right';
+    return 'tie';
+  }
+
+  return 'tie';
+}
+
+function formatName(name: string) {
+  return name.toUpperCase();
+}
+
+function CompareValue({
+  value,
+  isWinner,
 }: {
-  label: string;
-  left: string | number;
-  right: string | number;
+  value: string | number;
+  isWinner?: boolean;
 }) {
   return (
-    <Paper
-      elevation={0}
+    <Typography
       sx={{
-        p: 2,
-        borderRadius: '16px',
-        border: '1px solid #e5e7eb',
-        bgcolor: '#f8fafc',
+        fontFamily: '"Courier New", monospace',
+        fontSize: { xs: '1rem', sm: '1.25rem' },
+        fontWeight: 800,
+        lineHeight: 1.35,
+        color: isWinner ? '#4f624b' : '#53635f',
+        wordBreak: 'break-word',
       }}
     >
-      <Typography
+      {isWinner ? '✓ ' : ''}
+      {value}
+    </Typography>
+  );
+}
+
+function CompareRow({
+  label,
+  leftValue,
+  rightValue,
+  winner,
+}: {
+  label: string;
+  leftValue: string | number;
+  rightValue: string | number;
+  winner?: 'left' | 'right' | 'tie';
+}) {
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: '1fr',
+          sm: '170px 1fr 1fr',
+        },
+        borderTop: '1px solid #d8ccb7',
+        minHeight: { xs: 'auto', sm: 78 },
+      }}
+    >
+      <Box
         sx={{
-          fontSize: '0.75rem',
-          fontWeight: 800,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: '#64748b',
-          mb: 1.2,
+          px: { xs: 2.2, sm: 3 },
+          py: { xs: 1.8, sm: 2.6 },
+          display: 'flex',
+          alignItems: 'center',
         }}
       >
-        {label}
-      </Typography>
+        <Typography
+          sx={{
+            fontFamily: 'Georgia, serif',
+            fontSize: { xs: '1.05rem', sm: '1.18rem' },
+            fontWeight: 900,
+            color: '#2f3d39',
+          }}
+        >
+          {label}
+        </Typography>
+      </Box>
 
       <Box
         sx={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 2,
+          px: { xs: 2.2, sm: 3 },
+          py: { xs: 0.2, sm: 2.6 },
+          display: 'flex',
+          alignItems: 'center',
         }}
       >
-        <Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
-          {left}
-        </Typography>
-        <Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
-          {right}
-        </Typography>
+        <CompareValue value={leftValue} isWinner={winner === 'left'} />
       </Box>
-    </Paper>
+
+      <Box
+        sx={{
+          px: { xs: 2.2, sm: 3 },
+          pt: { xs: 0.8, sm: 2.6 },
+          pb: { xs: 2.2, sm: 2.6 },
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        <CompareValue value={rightValue} isWinner={winner === 'right'} />
+      </Box>
+    </Box>
   );
 }
 
@@ -287,33 +298,41 @@ export default function ComparePage() {
   const left = spaces[0];
   const right = spaces[1];
 
-  const leftBestTime = left ? getBestTimeLabel(left) : null;
-  const rightBestTime = right ? getBestTimeLabel(right) : null;
+  const hasTwoSpaces = Boolean(left && right);
 
-  const leftWalk = left ? getEstimatedWalkMinutes(left) : null;
-  const rightWalk = right ? getEstimatedWalkMinutes(right) : null;
+  const leftSerenity = left ? getSerenityScore(left) : 0;
+  const rightSerenity = right ? getSerenityScore(right) : 0;
 
-  const leftRoute = left ? getRouteEfficiency(left) : null;
-  const rightRoute = right ? getRouteEfficiency(right) : null;
+  let finalMessage = '';
 
-  const leftNoiseTrend = left ? generateNoiseTrend(left) : [];
-  const rightNoiseTrend = right ? generateNoiseTrend(right) : [];
-
-  const leftComfortTrend = left ? generateComfortTrend(left) : [];
-  const rightComfortTrend = right ? generateComfortTrend(right) : [];
+  if (left && right) {
+    if (leftSerenity > rightSerenity) {
+      finalMessage = `${left.name} is the stronger choice today for a calmer visit.`;
+    } else if (rightSerenity > leftSerenity) {
+      finalMessage = `${right.name} is the stronger choice today for a calmer visit.`;
+    } else {
+      finalMessage = `${left.name} and ${right.name} score evenly today — pick by mood.`;
+    }
+  }
 
   return (
     <>
       <AppNavbar />
 
-      <Box sx={{ minHeight: '100vh', bgcolor: '#f3f4f6', py: 4 }}>
-        <Container maxWidth="xl">
+      <Box
+        sx={{
+          minHeight: '100vh',
+          bgcolor: '#eee9df',
+          py: { xs: 3, md: 5 },
+        }}
+      >
+        <Container maxWidth="md">
           <Box
             sx={{
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: { xs: 'flex-start', md: 'center' },
-              flexDirection: { xs: 'column', md: 'row' },
+              alignItems: { xs: 'flex-start', sm: 'center' },
+              flexDirection: { xs: 'column', sm: 'row' },
               gap: 2,
               mb: 3,
             }}
@@ -321,16 +340,26 @@ export default function ComparePage() {
             <Box>
               <Typography
                 sx={{
-                  fontSize: { xs: '2.6rem', md: '3.6rem' },
+                  fontFamily: 'Georgia, serif',
+                  fontSize: { xs: '2rem', md: '2.4rem' },
                   fontWeight: 900,
-                  letterSpacing: '-0.05em',
-                  color: '#0f172a',
+                  color: '#2f3d39',
+                  lineHeight: 1,
                 }}
               >
-                Compare spaces
+                A vs B
               </Typography>
-              <Typography color="text.secondary" sx={{ mt: 1 }}>
-                Compare the places you selected from Discover.
+
+              <Typography
+                sx={{
+                  mt: 1,
+                  fontFamily: '"Courier New", monospace',
+                  color: '#68736e',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                }}
+              >
+                Compare your selected spaces side by side.
               </Typography>
             </Box>
 
@@ -342,16 +371,20 @@ export default function ComparePage() {
                   startIcon={<PlayArrowRoundedIcon />}
                   sx={{
                     borderRadius: '999px',
-                    px: 2.4,
+                    px: 2.2,
+                    py: 1,
                     textTransform: 'none',
-                    fontWeight: 800,
-                    bgcolor: '#5850ec',
+                    fontWeight: 900,
+                    bgcolor: '#536b4e',
+                    color: '#fffaf2',
+                    boxShadow: 'none',
                     '&:hover': {
-                      bgcolor: '#4e46df',
+                      bgcolor: '#435a3f',
+                      boxShadow: 'none',
                     },
                   }}
                 >
-                  Start routine
+                  Start navigation
                 </Button>
               )}
 
@@ -361,269 +394,206 @@ export default function ComparePage() {
                 startIcon={<DeleteOutlineRoundedIcon />}
                 sx={{
                   borderRadius: '999px',
-                  px: 2.4,
+                  px: 2.2,
+                  py: 1,
                   textTransform: 'none',
-                  fontWeight: 800,
+                  fontWeight: 900,
+                  color: '#536b4e',
+                  borderColor: '#b9c3ad',
+                  bgcolor: 'rgba(255, 250, 242, 0.5)',
+                  '&:hover': {
+                    borderColor: '#536b4e',
+                    bgcolor: 'rgba(255, 250, 242, 0.85)',
+                  },
                 }}
               >
-                Clear compare
+                Clear
               </Button>
             </Box>
           </Box>
 
-          {spaces.length < 2 ? (
+          {!hasTwoSpaces ? (
             <Paper
               elevation={0}
               sx={{
-                p: 4,
-                borderRadius: '28px',
-                border: '1px solid #e5e7eb',
-                bgcolor: '#ffffff',
+                p: { xs: 3, md: 5 },
+                borderRadius: '24px',
+                border: '1px solid #d8ccb7',
+                bgcolor: '#f8f3ea',
+                boxShadow: '0 18px 35px rgba(73, 62, 42, 0.12)',
               }}
             >
-              <Typography sx={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a' }}>
+              <Typography
+                sx={{
+                  fontFamily: 'Georgia, serif',
+                  fontSize: { xs: '1.8rem', md: '2.2rem' },
+                  fontWeight: 900,
+                  color: '#2f3d39',
+                }}
+              >
                 No spaces selected
               </Typography>
-              <Typography color="text.secondary" sx={{ mt: 1.2 }}>
-                Go back to Discover and click “Add to compare” on up to two places.
+
+              <Typography
+                sx={{
+                  mt: 1.5,
+                  fontFamily: '"Courier New", monospace',
+                  color: '#53635f',
+                  fontWeight: 700,
+                  lineHeight: 1.7,
+                }}
+              >
+                Go back to Discover and add two places to compare.
               </Typography>
             </Paper>
           ) : (
-            <Box
+            <Paper
+              elevation={0}
               sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
-                gap: 3,
+                overflow: 'hidden',
+                borderRadius: '24px',
+                border: '1px solid #d8ccb7',
+                bgcolor: '#f8f3ea',
+                boxShadow: '0 18px 35px rgba(73, 62, 42, 0.14)',
               }}
             >
-              {[left, right].map((space, index) => (
-                <Paper
-                  key={`${space?.name}-${index}`}
-                  elevation={0}
-                  sx={{
-                    overflow: 'hidden',
-                    borderRadius: '24px',
-                    border: '1px solid #dbe1e8',
-                    bgcolor: '#ffffff',
-                    boxShadow: '0 18px 50px rgba(15,23,42,0.06)',
-                  }}
-                >
-                  <Box
-                    sx={{
-                      position: 'relative',
-                      height: 260,
-                      backgroundImage: `url(${getCompareImage(space as Space)})`,
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'center',
-                      backgroundSize: 'cover',
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        position: 'absolute',
-                        inset: 0,
-                        background:
-                          'linear-gradient(180deg, rgba(2,6,23,0.18) 0%, rgba(2,6,23,0.70) 100%)',
-                      }}
-                    />
-
-                    <Box
-                      sx={{
-                        position: 'absolute',
-                        left: 24,
-                        bottom: 24,
-                        right: 24,
-                      }}
-                    >
-                      <Chip
-                        label={index === 0 ? 'Space A' : 'Space B'}
-                        sx={{
-                          mb: 1.4,
-                          borderRadius: '999px',
-                          bgcolor: '#fef3c7',
-                          color: '#854d0e',
-                          fontWeight: 800,
-                        }}
-                      />
-
-                      <Typography
-                        sx={{
-                          fontSize: { xs: '2rem', md: '2.7rem' },
-                          lineHeight: 1,
-                          fontWeight: 900,
-                          color: '#fff',
-                          letterSpacing: '-0.04em',
-                        }}
-                      >
-                        {space?.name}
-                      </Typography>
-
-                      <Typography sx={{ mt: 1, color: 'rgba(255,255,255,0.82)' }}>
-                        {space?.category} · {space?.suburb}
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ p: 3 }}>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      <Chip label={`${space?.distance} km away`} />
-                      <Chip label={`Quiet time: ${space?.quietTime}`} />
-                    </Box>
-                  </Box>
-                </Paper>
-              ))}
-
-              <Paper
-                elevation={0}
+              <Box
                 sx={{
-                  gridColumn: { xs: 'auto', lg: '1 / -1' },
-                  p: { xs: 2.5, md: 3 },
-                  borderRadius: '24px',
-                  border: '1px solid #dbe1e8',
-                  bgcolor: '#ffffff',
-                  boxShadow: '0 18px 50px rgba(15,23,42,0.06)',
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    sm: '170px 1fr 1fr',
+                  },
+                  minHeight: { xs: 'auto', sm: 124 },
                 }}
               >
-                <Typography
-                  sx={{
-                    fontSize: { xs: '2rem', md: '2.6rem' },
-                    fontWeight: 900,
-                    letterSpacing: '-0.04em',
-                    color: '#0f172a',
-                    mb: 2.5,
-                  }}
-                >
-                  24-hour noise trend
-                </Typography>
+                <Box sx={{ display: { xs: 'none', sm: 'block' } }} />
 
                 <Box
                   sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-                    gap: 2,
-                    mb: 3,
+                    px: { xs: 2.2, sm: 3 },
+                    pt: { xs: 3, sm: 3.2 },
+                    pb: { xs: 1.5, sm: 3 },
                   }}
                 >
-                  <MiniTrendChart
-                    title={`${left?.name ?? 'Space A'} noise trend`}
-                    data={leftNoiseTrend}
-                    min={35}
-                    max={90}
-                    suffix=" dB"
-                  />
-                  <MiniTrendChart
-                    title={`${right?.name ?? 'Space B'} noise trend`}
-                    data={rightNoiseTrend}
-                    min={35}
-                    max={90}
-                    suffix=" dB"
-                  />
+                  <Typography
+                    sx={{
+                      fontFamily: '"Courier New", monospace',
+                      fontSize: { xs: '1rem', sm: '1.05rem' },
+                      fontWeight: 900,
+                      letterSpacing: '0.18em',
+                      lineHeight: 1.55,
+                      color: '#c46f4f',
+                    }}
+                  >
+                    A · {formatName(left.name)}
+                  </Typography>
                 </Box>
-
-                <Typography
-                  sx={{
-                    fontSize: { xs: '2rem', md: '2.6rem' },
-                    fontWeight: 900,
-                    letterSpacing: '-0.04em',
-                    color: '#0f172a',
-                    mb: 2.5,
-                  }}
-                >
-                  24-hour comfort trend
-                </Typography>
 
                 <Box
                   sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-                    gap: 2,
-                    mb: 3,
+                    px: { xs: 2.2, sm: 3 },
+                    pt: { xs: 0, sm: 3.2 },
+                    pb: { xs: 3, sm: 3 },
                   }}
                 >
-                  <MiniTrendChart
-                    title={`${left?.name ?? 'Space A'} comfort trend`}
-                    data={leftComfortTrend}
-                    min={35}
-                    max={100}
-                    suffix="/100"
-                  />
-                  <MiniTrendChart
-                    title={`${right?.name ?? 'Space B'} comfort trend`}
-                    data={rightComfortTrend}
-                    min={35}
-                    max={100}
-                    suffix="/100"
-                  />
+                  <Typography
+                    sx={{
+                      fontFamily: '"Courier New", monospace',
+                      fontSize: { xs: '1rem', sm: '1.05rem' },
+                      fontWeight: 900,
+                      letterSpacing: '0.18em',
+                      lineHeight: 1.55,
+                      color: '#c46f4f',
+                    }}
+                  >
+                    B · {formatName(right.name)}
+                  </Typography>
                 </Box>
+              </Box>
 
-                <Typography
-                  sx={{
-                    fontSize: { xs: '2rem', md: '2.6rem' },
-                    fontWeight: 900,
-                    letterSpacing: '-0.04em',
-                    color: '#0f172a',
-                    mb: 2.5,
-                    mt: 1,
-                  }}
-                >
-                  Side-by-side comparison
-                </Typography>
+              <CompareRow
+                label="Suburb"
+                leftValue={left.suburb || 'Unknown'}
+                rightValue={right.suburb || 'Unknown'}
+              />
 
+              <CompareRow
+                label="Category"
+                leftValue={left.category || 'Unknown'}
+                rightValue={right.category || 'Unknown'}
+              />
+
+              <CompareRow
+                label="Noise"
+                leftValue={`${getNoiseValue(left)} dB`}
+                rightValue={`${getNoiseValue(right)} dB`}
+                winner={getWinner('Noise', left, right)}
+              />
+
+              <CompareRow
+                label="Comfort"
+                leftValue={`${getComfortValue(left)}/100`}
+                rightValue={`${getComfortValue(right)}/100`}
+                winner={getWinner('Comfort', left, right)}
+              />
+
+              <CompareRow
+                label="Shade"
+                leftValue={`${getShadeValue(left)}/100`}
+                rightValue={`${getShadeValue(right)}/100`}
+                winner={getWinner('Shade', left, right)}
+              />
+
+              <CompareRow
+                label="Crowd"
+                leftValue={getCrowdLabel(left)}
+                rightValue={getCrowdLabel(right)}
+              />
+
+              <CompareRow
+                label="Quiet window"
+                leftValue={left.quietTime || getPredictedBestTime(left, 'study')}
+                rightValue={right.quietTime || getPredictedBestTime(right, 'study')}
+              />
+
+              <CompareRow
+                label="Serenity score"
+                leftValue={leftSerenity}
+                rightValue={rightSerenity}
+                winner={getWinner('Serenity score', left, right)}
+              />
+
+              <Box
+                sx={{
+                  borderTop: '1px solid #d8ccb7',
+                  p: { xs: 2.2, sm: 3.5 },
+                }}
+              >
                 <Box
                   sx={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr',
-                    gap: 1.5,
+                    borderRadius: '18px',
+                    border: '1px solid #b9c8ae',
+                    bgcolor: '#dde6d5',
+                    px: { xs: 2.2, sm: 3.5 },
+                    py: { xs: 2.2, sm: 2.8 },
                   }}
                 >
-                  <MetricRow
-                    label="Noise"
-                    left={`${left.noiseDb} dB`}
-                    right={`${right.noiseDb} dB`}
-                  />
-                  <MetricRow
-                    label="Comfort"
-                    left={`${left.comfort}/100`}
-                    right={`${right.comfort}/100`}
-                  />
-                  <MetricRow
-                    label="Shade"
-                    left={`${left.shade}%`}
-                    right={`${right.shade}%`}
-                  />
-                  <MetricRow
-                    label="Distance"
-                    left={`${left.distance} km`}
-                    right={`${right.distance} km`}
-                  />
-                  <MetricRow
-                    label="Best quiet time"
-                    left={left.quietTime}
-                    right={right.quietTime}
-                  />
-                  <MetricRow
-                    label="Best time for study"
-                    left={leftBestTime?.study ?? '—'}
-                    right={rightBestTime?.study ?? '—'}
-                  />
-                  <MetricRow
-                    label="Estimated walking time"
-                    left={leftWalk ? `~${leftWalk} min` : '—'}
-                    right={rightWalk ? `~${rightWalk} min` : '—'}
-                  />
-                  <MetricRow
-                    label="Route convenience"
-                    left={leftRoute ?? '—'}
-                    right={rightRoute ?? '—'}
-                  />
-                  <MetricRow
-                    label="Reason"
-                    left={left.reason}
-                    right={right.reason}
-                  />
+                  <Typography
+                    sx={{
+                      fontFamily: 'Georgia, serif',
+                      fontSize: { xs: '1.15rem', sm: '1.35rem' },
+                      fontWeight: 700,
+                      fontStyle: 'italic',
+                      color: '#526d4f',
+                      lineHeight: 1.55,
+                    }}
+                  >
+                    {finalMessage}
+                  </Typography>
                 </Box>
-              </Paper>
-            </Box>
+              </Box>
+            </Paper>
           )}
         </Container>
       </Box>

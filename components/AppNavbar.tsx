@@ -10,7 +10,7 @@ const navItems = [
   { label: 'Discover', href: '/discover' },
   { label: 'Compare', href: '/compare' },
   { label: 'Trends', href: '/trends' },
-  { label: 'Suggestions', href: '/suggestions' },
+  { label: 'Help', href: '/help' },
 ];
 
 export default function AppNavbar() {
