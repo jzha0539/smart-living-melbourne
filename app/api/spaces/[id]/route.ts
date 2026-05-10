@@ -38,9 +38,9 @@ function getCrowdLabel(noise: number): string {
 }
 
 function getQuietTime(noise: number): string {
-  if (noise <= 50) return '7–9 AM';
-  if (noise <= 65) return '10–11 AM';
-  return '2–4 PM';
+  if (noise <= 50) return '7-9 AM';
+  if (noise <= 65) return '10-11 AM';
+  return '2-4 PM';
 }
 
 function getActivityFit(placeType: string, noise: number): string[] {

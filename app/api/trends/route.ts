@@ -5,9 +5,9 @@ export const dynamic = 'force-dynamic';
 
 type PoiRow = {
   poi_id: string | number | null;
-  google_place_id: string | null;
   name: string | null;
   category: string | null;
+  region: string | null;
   address: string | null;
   suburb: string | null;
   postcode: string | number | null;
@@ -226,7 +226,6 @@ function mapPlace(row: PoiRow) {
 
   return {
     poiId: toStringValue(row.poi_id),
-    googlePlaceId: toStringValue(row.google_place_id),
     placeName: toStringValue(row.name, 'Unnamed place'),
     placeType: toStringValue(row.category, 'lifestyle'),
 
@@ -265,9 +264,9 @@ export async function GET(request: NextRequest) {
     const placesResult = await pool.query<PoiRow>(`
       SELECT
         poi_id,
-        google_place_id,
         name,
         category,
+        region,
         address,
         suburb,
         postcode,

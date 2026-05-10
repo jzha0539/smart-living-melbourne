@@ -3,9 +3,9 @@ import pool from '../../../lib/db';
 
 type DbRow = {
   poi_id: string | number | null;
-  google_place_id: string | null;
   name: string | null;
   category: string | null;
+  region: string | null;
   address: string | null;
   suburb: string | null;
   postcode: string | number | null;
@@ -229,19 +229,23 @@ function getRecommendationReason(params: {
       ? 'Opening hours are available for planning'
       : 'Opening hours are not currently available';
 
-  return `${name} is a ${displayCategory.toLowerCase()} place in ${suburb || 'Melbourne'}. ${ratingText}. The measured noise level is around ${Math.round(
+  return `${name} is a ${displayCategory.toLowerCase()} place in ${
+    suburb || 'Melbourne'
+  }. ${ratingText}. The measured noise level is around ${Math.round(
     noiseDb
   )} dB, which is labelled as ${noiseLabel}. Current environmental comfort is ${comfortLabel.toLowerCase()} based on temperature, humidity, and wind speed. ${openingText}.`;
 }
 
 function mapRowToSpace(row: DbRow) {
   const id = toStringValue(row.poi_id);
-  const googlePlaceId = toStringValue(row.google_place_id);
+  const googlePlaceId = id;
+
   const name = toStringValue(row.name, 'Unnamed place');
   const rawCategory = toStringValue(row.category, 'lifestyle');
   const category = normalizeCategory(rawCategory);
   const displayCategory = getDisplayCategory(rawCategory);
 
+  const region = toStringValue(row.region);
   const address = toStringValue(row.address);
   const suburb = toStringValue(row.suburb, 'Melbourne');
   const postcode = toStringValue(row.postcode);
@@ -276,6 +280,7 @@ function mapRowToSpace(row: DbRow) {
     displayCategory,
     primaryUse: getPrimaryUse(rawCategory),
 
+    region,
     address,
     suburb,
     postcode,
@@ -327,9 +332,9 @@ export async function GET() {
     const result = await pool.query<DbRow>(`
       SELECT
         poi_id,
-        google_place_id,
         name,
         category,
+        region,
         address,
         suburb,
         postcode,
