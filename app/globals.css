@@ -1,9 +1,14 @@
 html,
 body {
-  margin: 0;
-  padding: 0;
+  background: #f5f1e8;
+  color: #243c35;
 }
 
 * {
   box-sizing: border-box;
+}
+
+::selection {
+  background: #d99a73;
+  color: #fffdf8;
 }

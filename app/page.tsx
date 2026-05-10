@@ -37,9 +37,9 @@ const fadeUp = keyframes`
 `;
 
 const pulseGlow = keyframes`
-  0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.18); }
-  70% { box-shadow: 0 0 0 14px rgba(34,197,94,0); }
-  100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+  0% { box-shadow: 0 0 0 0 rgba(36,60,53,0.18); }
+  70% { box-shadow: 0 0 0 14px rgba(36,60,53,0); }
+  100% { box-shadow: 0 0 0 0 rgba(36,60,53,0); }
 `;
 
 const introGlow = keyframes`
@@ -110,13 +110,13 @@ function StatCard({
       sx={{
         p: 1.8,
         borderRadius: '16px',
-        border: '1px solid #e5e7eb',
-        bgcolor: '#f8fafc',
+        border: '1px solid #E4D9C8',
+        bgcolor: '#FFFDF8',
         minHeight: 88,
         transition: 'transform 0.24s ease, box-shadow 0.24s ease',
         '&:hover': {
           transform: 'translateY(-3px)',
-          boxShadow: '0 12px 24px rgba(15,23,42,0.07)',
+          boxShadow: '0 12px 24px rgba(36,60,53,0.08)',
         },
       }}
     >
@@ -129,8 +129,8 @@ function StatCard({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: '#ecfdf5',
-            color: '#15803d',
+            bgcolor: '#F1EBDD',
+            color: '#243C35',
             flexShrink: 0,
             '& .MuiSvgIcon-root': {
               fontSize: 20,
@@ -148,7 +148,7 @@ function StatCard({
               fontWeight: 900,
               textTransform: 'uppercase',
               letterSpacing: '0.12em',
-              color: '#64748b',
+              color: '#6E7771',
               lineHeight: 1.2,
               mb: 0.3,
             }}
@@ -160,7 +160,7 @@ function StatCard({
             sx={{
               fontSize: '1.05rem',
               fontWeight: 900,
-              color: '#0f172a',
+              color: '#243C35',
               lineHeight: 1,
             }}
           >
@@ -191,10 +191,10 @@ function NoiseDialCard({
   const maxDb = 80;
 
   function getNoiseColor(db: number) {
-    if (db <= 50) return '#22c55e'; // green
-    if (db <= 60) return '#eab308'; // yellow
-    if (db <= 70) return '#f97316'; // orange
-    return '#ef4444'; // red
+    if (db <= 50) return '#4F6B57'; // green
+    if (db <= 60) return '#C9A14A'; // yellow
+    if (db <= 70) return '#D99A73'; // orange
+    return '#B77956'; // red
   }
 
   const noiseColor = getNoiseColor(threshold);
@@ -242,7 +242,7 @@ function NoiseDialCard({
       sx={{
         p: 2.2,
         borderRadius: '20px',
-        bgcolor: alpha('#ffffff', 0.94),
+        bgcolor: alpha('#FFFDF8', 0.94),
         ml: { md: 'auto' },
         width: '100%',
         maxWidth: 470,
@@ -276,7 +276,7 @@ function NoiseDialCard({
               cy={size / 2}
               r={radius}
               fill="none"
-              stroke="rgba(148,163,184,0.16)"
+              stroke="rgba(79,107,87,0.18)"
               strokeWidth={stroke}
             />
             <circle
@@ -314,7 +314,7 @@ function NoiseDialCard({
                   fontWeight: 800,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
-                  color: '#64748b',
+                  color: '#6E7771',
                 }}
               >
                 Noise threshold
@@ -355,7 +355,7 @@ function NoiseDialCard({
               fontWeight: 800,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              color: '#64748b',
+              color: '#6E7771',
               mb: 1,
             }}
           >
@@ -363,9 +363,9 @@ function NoiseDialCard({
           </Typography>
 
           {loading ? (
-            <Typography sx={{ color: '#64748b' }}>Loading...</Typography>
+            <Typography sx={{ color: '#6E7771' }}>Loading...</Typography>
           ) : spaces.length === 0 ? (
-            <Typography sx={{ color: '#64748b' }}>Please turn the ring</Typography>
+            <Typography sx={{ color: '#6E7771' }}>Please turn the ring</Typography>
           ) : (
             <Box sx={{ display: 'grid', gap: 1 }}>
               {spaces.slice(0, 3).map((space) => (
@@ -387,7 +387,7 @@ function NoiseDialCard({
                     fontWeight: 800,
                     fontSize: '0.95rem',
                     bgcolor: activeSpaceId === space.id ? noiseColor : 'transparent',
-                    color: activeSpaceId === space.id ? '#fff' : '#334155',
+                    color: activeSpaceId === space.id ? '#FFFDF8' : '#4F5E57',
                     borderColor: alpha(noiseColor, 0.32),
                     transition: 'all 0.35s ease',
                     '&:hover': {
@@ -417,7 +417,7 @@ function NoiseDialCard({
                     sx={{
                       fontSize: '0.9rem',
                       fontWeight: 900,
-                      color: activeSpaceId === space.id ? '#fff' : noiseColor,
+                      color: activeSpaceId === space.id ? '#FFFDF8' : noiseColor,
                       transition: 'color 0.35s ease',
                       flexShrink: 0,
                     }}
@@ -487,8 +487,8 @@ function HomeNoiseCard({
         sx={{
           p: 2,
           borderRadius: '22px',
-          bgcolor: '#f8fafc',
-          border: '1px solid #e5e7eb',
+          bgcolor: '#FFFDF8',
+          border: '1px solid #E4D9C8',
           minHeight: 128,
           display: 'flex',
           flexDirection: 'column',
@@ -501,7 +501,7 @@ function HomeNoiseCard({
     fontWeight: 900,
     textTransform: 'uppercase',
     letterSpacing: '0.12em',
-    color: '#64748b',
+    color: '#6E7771',
     fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
   }}
 >
@@ -514,7 +514,7 @@ function HomeNoiseCard({
             lineHeight: 1,
             fontWeight: 900,
             letterSpacing: '-0.04em',
-            color: '#0f172a',
+            color: '#243C35',
             wordBreak: 'break-word',
             fontFamily:
               '"Arial Black", "Inter", "Helvetica Neue", Arial, sans-serif',
@@ -532,13 +532,13 @@ function HomeNoiseCard({
       sx={{
         p: 2.4,
         borderRadius: '28px',
-        bgcolor: '#ffffff',
+        bgcolor: '#EFE8DA',
         border: highlight
-          ? '2px solid rgba(88,80,236,0.34)'
-          : '1px solid #e5e7eb',
+          ? '2px solid rgba(36,60,53,0.34)'
+          : '1px solid #E4D9C8',
         boxShadow: highlight
-          ? '0 20px 44px rgba(88,80,236,0.16)'
-          : '0 10px 26px rgba(15,23,42,0.05)',
+          ? '0 20px 44px rgba(36,60,53,0.16)'
+          : '0 10px 26px rgba(36,60,53,0.06)',
         transition: 'all 0.25s ease',
         height: '100%',
       }}
@@ -558,8 +558,8 @@ function HomeNoiseCard({
             label={`Top ${rank}`}
             sx={{
               borderRadius: '999px',
-              bgcolor: '#5b52f0',
-              color: '#fff',
+              bgcolor: '#243C35',
+              color: '#FFFDF8',
               fontWeight: 800,
             }}
           />
@@ -568,9 +568,9 @@ function HomeNoiseCard({
             label={space.category}
             sx={{
               borderRadius: '999px',
-              bgcolor: '#ffffff',
-              border: '1px solid #cbd5e1',
-              color: '#334155',
+              bgcolor: '#FFFDF8',
+              border: '1px solid #CFC4B4',
+              color: '#4F5E57',
               fontWeight: 700,
             }}
           />
@@ -580,9 +580,9 @@ function HomeNoiseCard({
           label={`${space.distance} km`}
           sx={{
             borderRadius: '999px',
-            bgcolor: '#ffffff',
-            border: '1px solid #d1d5db',
-            color: '#334155',
+            bgcolor: '#FFFDF8',
+            border: '1px solid #CFC4B4',
+            color: '#4F5E57',
             fontWeight: 800,
           }}
         />
@@ -594,9 +594,9 @@ function HomeNoiseCard({
           sx={{
             mb: 1.8,
             borderRadius: '999px',
-            bgcolor: '#f0f9ff',
-            color: '#1d9bf0',
-            border: '1px solid #60a5fa',
+            bgcolor: '#F1EBDD',
+            color: '#4F6B57',
+            border: '1px solid #D99A73',
             fontWeight: 800,
           }}
         />
@@ -607,7 +607,7 @@ function HomeNoiseCard({
           fontSize: { xs: '2.15rem', md: '2.75rem' },
           lineHeight: 1,
           fontWeight: 900,
-          color: '#1e293b',
+          color: '#243C35',
           letterSpacing: '-0.05em',
         }}
       >
@@ -617,7 +617,7 @@ function HomeNoiseCard({
       <Typography
         sx={{
           mt: 1,
-          color: '#64748b',
+          color: '#6E7771',
           fontSize: '1rem',
           textTransform: 'lowercase',
         }}
@@ -645,7 +645,7 @@ function HomeNoiseCard({
             left: 16,
             borderRadius: '999px',
             bgcolor: 'rgba(255,255,255,0.92)',
-            color: '#0f172a',
+            color: '#243C35',
             fontWeight: 800,
           }}
         />
@@ -668,19 +668,19 @@ function HomeNoiseCard({
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.1, mt: 2 }}>
         <Chip
           label={`Quiet time: ${space.quietTime}`}
-          sx={{ borderRadius: '999px', bgcolor: '#f3f4f6' }}
+          sx={{ borderRadius: '999px', bgcolor: '#F5F1E8' }}
         />
         <Chip
           label={`Crowd: ${space.crowd}`}
-          sx={{ borderRadius: '999px', bgcolor: '#f3f4f6' }}
+          sx={{ borderRadius: '999px', bgcolor: '#F5F1E8' }}
         />
         <Chip
           label={space.activityFit?.[0] ?? 'study'}
           sx={{
             borderRadius: '999px',
-            bgcolor: '#ffffff',
-            border: '1px solid #60a5fa',
-            color: '#1d9bf0',
+            bgcolor: '#FFFDF8',
+            border: '1px solid #D99A73',
+            color: '#4F6B57',
           }}
         />
       </Box>
@@ -696,10 +696,10 @@ function HomeNoiseCard({
             textTransform: 'none',
             fontWeight: 800,
             fontSize: '1rem',
-            color: '#5850ec',
-            bgcolor: '#f1efff',
+            color: '#243C35',
+            bgcolor: '#EFE8DA',
             '&:hover': {
-              bgcolor: '#e9e7ff',
+              bgcolor: '#E4D9C8',
             },
           }}
         >
@@ -716,9 +716,9 @@ function HomeNoiseCard({
             textTransform: 'none',
             fontWeight: 800,
             fontSize: '1rem',
-            bgcolor: '#081a44',
+            bgcolor: '#243C35',
             '&:hover': {
-              bgcolor: '#061536',
+              bgcolor: '#182B25',
             },
           }}
         >
@@ -735,12 +735,12 @@ function HomeNoiseCard({
             textTransform: 'none',
             fontWeight: 800,
             fontSize: '1rem',
-            borderColor: '#7c6cff',
-            color: isCompared ? '#fff' : '#5b52f0',
-            bgcolor: isCompared ? '#5b52f0' : 'transparent',
+            borderColor: '#4F6B57',
+            color: isCompared ? '#FFFDF8' : '#243C35',
+            bgcolor: isCompared ? '#243C35' : 'transparent',
             '&:hover': {
-              borderColor: '#5b52f0',
-              bgcolor: isCompared ? '#4f46e5' : '#f8f7ff',
+              borderColor: '#243C35',
+              bgcolor: isCompared ? '#243C35' : '#F1EBDD',
             },
           }}
         >
@@ -881,7 +881,7 @@ export default function HomePage() {
             cursor: 'pointer',
             overflow: 'hidden',
             userSelect: 'none',
-            backgroundColor: '#eef1f8',
+            backgroundColor: '#F5F1E8',
             opacity: introLeaving ? 0 : 1,
             transition: 'opacity 0.8s ease',
           }}
@@ -905,13 +905,13 @@ export default function HomePage() {
               position: 'absolute',
               inset: 0,
               background: `
-                radial-gradient(circle at 18% 22%, rgba(99,102,241,0.12), transparent 20%),
-                radial-gradient(circle at 82% 76%, rgba(139,92,246,0.14), transparent 22%),
+                radial-gradient(circle at 18% 22%, rgba(79,107,87,0.14), transparent 20%),
+                radial-gradient(circle at 82% 76%, rgba(217,154,115,0.16), transparent 22%),
                 linear-gradient(
                   180deg,
-                  rgba(248,250,252,0.40) 0%,
-                  rgba(248,250,252,0.56) 36%,
-                  rgba(248,250,252,0.78) 100%
+                  rgba(245,241,232,0.42) 0%,
+                  rgba(245,241,232,0.58) 36%,
+                  rgba(245,241,232,0.82) 100%
                 )
               `,
               backdropFilter: 'blur(2px)',
@@ -946,10 +946,10 @@ export default function HomePage() {
                   height: 38,
                   px: 1.2,
                   borderRadius: '999px',
-                  bgcolor: 'rgba(255,255,255,0.72)',
-                  color: '#4f46e5',
-                  border: '1px solid rgba(79,70,229,0.12)',
-                  boxShadow: '0 10px 30px rgba(15,23,42,0.08)',
+                  bgcolor: 'rgba(255,253,248,0.76)',
+                  color: '#243C35',
+                  border: '1px solid rgba(36,60,53,0.12)',
+                  boxShadow: '0 10px 30px rgba(36,60,53,0.08)',
                   backdropFilter: 'blur(10px)',
                   fontWeight: 800,
                   fontSize: '0.92rem',
@@ -963,15 +963,15 @@ export default function HomePage() {
                   lineHeight: 0.94,
                   fontWeight: 950,
                   letterSpacing: '-0.07em',
-                  color: '#0f172a',
+                  color: '#243C35',
                   textAlign: 'center',
                   animation: introLeaving ? 'none' : `${introTextFloat} 5.4s ease-in-out infinite`,
                   textShadow: '0 8px 28px rgba(255,255,255,0.42)',
                   fontFamily: '"Arial Black", Inter, "Helvetica Neue", Arial, sans-serif',
                   '& .outlined': {
                     color: 'transparent',
-                    WebkitTextStroke: '1.8px rgba(15,23,42,0.92)',
-                    textShadow: '0 8px 22px rgba(255,255,255,0.22)',
+                    WebkitTextStroke: '1.8px rgba(36,60,53,0.92)',
+                    textShadow: '0 8px 22px rgba(255,253,248,0.24)',
                   },
                 }}
               >
@@ -999,9 +999,9 @@ export default function HomePage() {
                   px: 2.6,
                   py: 1.15,
                   borderRadius: '999px',
-                  bgcolor: 'rgba(255,255,255,0.74)',
-                  border: '1px solid rgba(15,23,42,0.08)',
-                  boxShadow: '0 12px 30px rgba(15,23,42,0.08)',
+                  bgcolor: 'rgba(255,253,248,0.78)',
+                  border: '1px solid rgba(36,60,53,0.08)',
+                  boxShadow: '0 12px 30px rgba(36,60,53,0.08)',
                   backdropFilter: 'blur(10px)',
                   animation: introLeaving ? 'none' : `${introHintFade} 2.2s ease-in-out infinite`,
                 }}
@@ -1012,7 +1012,7 @@ export default function HomePage() {
                     fontWeight: 800,
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
-                    color: '#334155',
+                    color: '#4F5E57',
                   }}
                 >
                   Tap anywhere to enter
@@ -1027,17 +1027,17 @@ export default function HomePage() {
         <>
           <AppNavbar />
 
-          <Box sx={{ minHeight: '100vh', bgcolor: '#f3f4f6', pb: 6 }}>
+          <Box sx={{ minHeight: '100vh', bgcolor: '#F5F1E8', pb: 6 }}>
             <Container maxWidth="xl" sx={{ pt: 2 }}>
               <Paper
                 elevation={0}
                 sx={{
                   overflow: 'hidden',
                   borderRadius: '22px',
-                  border: '1px solid #dbe1e8',
-                  boxShadow: '0 18px 50px rgba(15,23,42,0.08)',
+                  border: '1px solid #E4D9C8',
+                  boxShadow: '0 18px 50px rgba(36,60,53,0.08)',
                   animation: `${fadeUp} 0.7s ease both`,
-                  bgcolor: '#fff',
+                  bgcolor: '#FFFDF8',
                 }}
               >
                 <Box
@@ -1066,7 +1066,7 @@ export default function HomePage() {
                       position: 'absolute',
                       inset: 0,
                       background:
-                        'linear-gradient(180deg, rgba(2,6,23,0.22) 0%, rgba(2,6,23,0.52) 55%, rgba(2,6,23,0.82) 100%)',
+                        'linear-gradient(180deg, rgba(24,43,37,0.22) 0%, rgba(24,43,37,0.50) 55%, rgba(24,43,37,0.76) 100%)',
                     }}
                   />
 
@@ -1075,7 +1075,7 @@ export default function HomePage() {
                       position: 'absolute',
                       inset: 0,
                       background:
-                        'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)',
+                        'linear-gradient(rgba(255,253,248,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,253,248,0.08) 1px, transparent 1px)',
                       backgroundSize: '32px 32px',
                       opacity: 0.24,
                     }}
@@ -1103,8 +1103,8 @@ export default function HomePage() {
                         label="Smart Living Melbourne"
                         sx={{
                           borderRadius: '999px',
-                          bgcolor: '#fef3c7',
-                          color: '#854d0e',
+                          bgcolor: '#F1EBDD',
+                          color: '#243C35',
                           fontWeight: 800,
                           height: 28,
                         }}
@@ -1113,9 +1113,9 @@ export default function HomePage() {
                         label="Quiet • Comfortable • Nearby"
                         sx={{
                           borderRadius: '999px',
-                          bgcolor: alpha('#ffffff', 0.14),
-                          color: '#fff',
-                          border: '1px solid rgba(255,255,255,0.18)',
+                          bgcolor: alpha('#FFFDF8', 0.14),
+                          color: '#FFFDF8',
+                          border: '1px solid rgba(255,253,248,0.24)',
                           fontWeight: 700,
                           height: 28,
                         }}
@@ -1136,7 +1136,7 @@ export default function HomePage() {
                             fontSize: { xs: '2.5rem', md: '4rem' },
                             lineHeight: 0.95,
                             fontWeight: 900,
-                            color: '#fff',
+                            color: '#FFFDF8',
                             letterSpacing: '-0.05em',
                             maxWidth: 780,
                             animation: `${fadeUp} 0.84s ease both`,
@@ -1151,7 +1151,7 @@ export default function HomePage() {
                             mt: 1.8,
                             maxWidth: 720,
                             fontSize: { xs: '1rem', md: '1.08rem' },
-                            color: 'rgba(255,255,255,0.82)',
+                            color: 'rgba(255,253,248,0.86)',
                             animation: `${fadeUp} 0.84s ease both`,
                             animationDelay: '0.18s',
                           }}
@@ -1182,10 +1182,10 @@ export default function HomePage() {
                               py: 1.3,
                               textTransform: 'none',
                               fontWeight: 800,
-                              bgcolor: '#15803d',
+                              bgcolor: '#243C35',
                               animation: `${pulseGlow} 2.8s infinite`,
                               '&:hover': {
-                                bgcolor: '#166534',
+                                bgcolor: '#182B25',
                               },
                             }}
                           >
@@ -1203,10 +1203,10 @@ export default function HomePage() {
                               py: 1.3,
                               textTransform: 'none',
                               fontWeight: 800,
-                              bgcolor: '#ffffff',
-                              color: '#0f172a',
+                              bgcolor: '#FFFDF8',
+                              color: '#243C35',
                               '&:hover': {
-                                bgcolor: '#f8fafc',
+                                bgcolor: '#FFFDF8',
                               },
                             }}
                           >
@@ -1236,7 +1236,7 @@ export default function HomePage() {
                   </Box>
                 </Box>
 
-                <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: '#f8fafc' }}>
+                <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: '#FFFDF8' }}>
                   <Box
                     sx={{
                       display: 'grid',
@@ -1278,9 +1278,9 @@ export default function HomePage() {
                   mt: 3,
                   p: 2,
                   borderRadius: '18px',
-                  border: '1px solid #dbe1e8',
-                  bgcolor: '#ffffff',
-                  boxShadow: '0 12px 30px rgba(15,23,42,0.05)',
+                  border: '1px solid #E4D9C8',
+                  bgcolor: '#FFFDF8',
+                  boxShadow: '0 12px 30px rgba(36,60,53,0.06)',
                   animation: `${fadeUp} 0.75s ease both`,
                 }}
               >
@@ -1300,7 +1300,7 @@ export default function HomePage() {
                         fontWeight: 900,
                         letterSpacing: '0.12em',
                         textTransform: 'uppercase',
-                        color: '#5850ec',
+                        color: '#243C35',
                         mb: 0.6,
                       }}
                     >
@@ -1320,8 +1320,8 @@ export default function HomePage() {
                             onDelete={() => handleRemoveFromCompare(item.name)}
                             sx={{
                               borderRadius: '999px',
-                              bgcolor: '#f1efff',
-                              color: '#4f46e5',
+                              bgcolor: '#EFE8DA',
+                              color: '#243C35',
                               fontWeight: 800,
                             }}
                           />
@@ -1360,14 +1360,14 @@ export default function HomePage() {
                         px: 2.4,
                         textTransform: 'none',
                         fontWeight: 800,
-                        bgcolor: '#5850ec',
+                        bgcolor: '#243C35',
                         boxShadow: '0 10px 20px rgba(88,80,236,0.25)',
                         '&:hover': {
-                          bgcolor: '#4e46df',
+                          bgcolor: '#182B25',
                         },
                         '&.Mui-disabled': {
-                          bgcolor: '#c7c4ff',
-                          color: '#fff',
+                          bgcolor: '#CFC4B4',
+                          color: '#FFFDF8',
                         },
                       }}
                     >
@@ -1392,8 +1392,8 @@ export default function HomePage() {
                   sx={{
                     p: { xs: 2.5, md: 3 },
                     borderRadius: '22px',
-                    border: '1px solid #dbe1e8',
-                    bgcolor: '#ffffff',
+                    border: '1px solid #E4D9C8',
+                    bgcolor: '#FFFDF8',
                     boxShadow: '0 18px 50px rgba(15,23,42,0.06)',
                     animation: `${fadeUp} 0.85s ease both`,
                     animationDelay: '0.12s',
@@ -1405,7 +1405,7 @@ export default function HomePage() {
                       fontSize: { xs: '2rem', md: '2.8rem' },
                       fontWeight: 900,
                       mb: 0.8,
-                      color: '#0f172a',
+                      color: '#243C35',
                       letterSpacing: '-0.04em',
                     }}
                   >
@@ -1441,15 +1441,15 @@ export default function HomePage() {
                       sx={{
                         p: 3,
                         borderRadius: '20px',
-                        border: '1px solid #e5e7eb',
-                        bgcolor: '#ffffff',
+                        border: '1px solid #E4D9C8',
+                        bgcolor: '#FFFDF8',
                       }}
                     >
                       <Typography
                         sx={{
                           fontSize: '1.35rem',
                           fontWeight: 900,
-                          color: '#0f172a',
+                          color: '#243C35',
                         }}
                       >
                         No places match the current noise threshold
