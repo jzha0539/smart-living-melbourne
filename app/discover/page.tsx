@@ -8,19 +8,28 @@ import {
   Button,
   Chip,
   Container,
+  FormControl,
   Grid,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
+  TextField,
   Typography,
 } from '@mui/material';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import CompareArrowsRoundedIcon from '@mui/icons-material/CompareArrowsRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import AppNavbar from '../../components/AppNavbar';
-import FilterPanel from '../../components/FilterPanel';
 import MapPlaceholder from '../../components/MapPlaceholder';
 import SpaceCard from '../../components/SpaceCard';
 import FloatingCompareButton from '../../components/FloatingCompareButton';
-import { ActivityType, CategoryFilter, SortType, Space } from '../../types/space';
+import { Space } from '../../types/space';
 import { getSpaces } from '../../lib/api-client';
+
+type CategoryFilter = 'all' | 'study' | 'culture' | 'leisure' | 'lifestyle';
+type ActivityFilter = 'study' | 'remote-work' | 'relax';
+type SortFilter = 'best-match' | 'quietest' | 'highest-rating' | 'most-reviews';
 
 type SearchCenter = {
   latitude: number;
@@ -38,18 +47,74 @@ const MELBOURNE_CBD_CENTER: LocationPoint = {
   longitude: 144.9631,
 };
 
+function getSpaceId(space: Space): string {
+  const record = space as unknown as Record<string, unknown>;
+
+  return String(
+    record.poiId ??
+      record.poi_id ??
+      record.googlePlaceId ??
+      record.google_place_id ??
+      space.id ??
+      `${space.name}-${space.latitude}-${space.longitude}`
+  );
+}
+
+function getNumberValue(space: Space, keys: string[], fallback = 0): number {
+  const record = space as unknown as Record<string, unknown>;
+
+  for (const key of keys) {
+    const value = record[key];
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string' && value.trim() && !Number.isNaN(Number(value))) {
+      return Number(value);
+    }
+  }
+
+  return fallback;
+}
+
+function getStringValue(space: Space, keys: string[], fallback = ''): string {
+  const record = space as unknown as Record<string, unknown>;
+
+  for (const key of keys) {
+    const value = record[key];
+
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
+  }
+
+  return fallback;
+}
+
 function getSpaceLatitude(space: Space) {
-  return Number(space.latitude);
+  return getNumberValue(space, ['latitude'], Number.NaN);
 }
 
 function getSpaceLongitude(space: Space) {
-  return Number(space.longitude);
+  return getNumberValue(space, ['longitude'], Number.NaN);
 }
 
 function hasValidCoordinates(space: Space) {
+  const latitude = getSpaceLatitude(space);
+  const longitude = getSpaceLongitude(space);
+
   return (
-    Number.isFinite(getSpaceLatitude(space)) &&
-    Number.isFinite(getSpaceLongitude(space))
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -39 &&
+    latitude <= -36 &&
+    longitude >= 143 &&
+    longitude <= 146
   );
 }
 
@@ -74,9 +139,112 @@ function getDistanceKm(from: LocationPoint, to: LocationPoint) {
   return earthRadiusKm * c;
 }
 
+function getActivityMatch(space: Space, activity: ActivityFilter): boolean {
+  const category = getStringValue(space, ['category'], '').toLowerCase();
+  const name = getStringValue(space, ['name'], '').toLowerCase();
+  const noiseDb = getNumberValue(space, ['noiseDb', 'noise_db'], 65);
+  const rating = getNumberValue(space, ['rating'], 0);
+  const ratingCount = getNumberValue(space, ['ratingCount', 'rating_count'], 0);
+  const openingHours = getStringValue(space, ['openingHours', 'opening_hours'], '');
 
-function getBestScore(space: Space) {
-  return (100 - space.noiseDb) * 0.45 + space.comfort * 0.35 + space.shade * 0.2;
+  if (activity === 'study') {
+    return (
+      category === 'study' ||
+      noiseDb <= 60 ||
+      name.includes('library') ||
+      name.includes('book') ||
+      name.includes('study')
+    );
+  }
+
+  if (activity === 'remote-work') {
+    return (
+      category === 'study' ||
+      (category === 'lifestyle' && noiseDb <= 62) ||
+      (rating >= 4.2 && Boolean(openingHours) && noiseDb <= 65)
+    );
+  }
+
+  if (activity === 'relax') {
+    return (
+      category === 'leisure' ||
+      category === 'culture' ||
+      (noiseDb <= 65 && ratingCount < 800)
+    );
+  }
+
+  return true;
+}
+
+function getBestMatchScore(space: Space, activity: ActivityFilter): number {
+  const category = getStringValue(space, ['category'], '').toLowerCase();
+  const noiseDb = getNumberValue(space, ['noiseDb', 'noise_db'], 65);
+  const comfort = getNumberValue(space, ['comfort'], 70);
+  const rating = getNumberValue(space, ['rating'], 0);
+  const ratingCount = getNumberValue(space, ['ratingCount', 'rating_count'], 0);
+  const windSpeed = getNumberValue(space, ['windSpeed', 'avg_wind_speed'], 10);
+  const temperature = getNumberValue(space, ['temperature', 'air_temperature'], 22);
+  const humidity = getNumberValue(space, ['humidity', 'relative_humidity'], 50);
+  const openingHours = getStringValue(space, ['openingHours', 'opening_hours'], '');
+
+  const quietScore = Math.max(0, Math.min(100, 100 - noiseDb));
+  const ratingScore = rating > 0 ? Math.max(0, Math.min(100, (rating / 5) * 100)) : 55;
+
+  const weatherScore = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        100 -
+          Math.max(0, windSpeed - 8) * 2.5 -
+          Math.abs(temperature - 22) * 3 -
+          Math.abs(humidity - 50) * 0.7
+      )
+    )
+  );
+
+  const popularityScore =
+    ratingCount === 0
+      ? 45
+      : ratingCount < 50
+        ? 60
+        : ratingCount < 200
+          ? 85
+          : ratingCount < 800
+            ? 75
+            : 62;
+
+  const availabilityScore = openingHours ? 80 : 45;
+
+  let activityBonus = 0;
+
+  if (activity === 'study') {
+    if (category === 'study') activityBonus += 20;
+    if (noiseDb <= 55) activityBonus += 15;
+  }
+
+  if (activity === 'remote-work') {
+    if (category === 'study') activityBonus += 15;
+    if (category === 'lifestyle') activityBonus += 12;
+    if (openingHours) activityBonus += 10;
+    if (rating >= 4.2) activityBonus += 10;
+  }
+
+  if (activity === 'relax') {
+    if (category === 'leisure') activityBonus += 20;
+    if (category === 'culture') activityBonus += 12;
+    if (noiseDb <= 65) activityBonus += 8;
+  }
+
+  return (
+    comfort * 0.25 +
+    quietScore * 0.25 +
+    weatherScore * 0.2 +
+    ratingScore * 0.15 +
+    popularityScore * 0.1 +
+    availabilityScore * 0.05 +
+    activityBonus
+  );
 }
 
 function DiscoverPageContent() {
@@ -86,15 +254,14 @@ function DiscoverPageContent() {
 
   const [search, setSearch] = React.useState('');
   const [category, setCategory] = React.useState<CategoryFilter>('all');
-  const [activity, setActivity] = React.useState<ActivityType>('study');
-  const [sortBy, setSortBy] = React.useState<SortType>('best');
+  const [activity, setActivity] = React.useState<ActivityFilter>('study');
+  const [sortBy, setSortBy] = React.useState<SortFilter>('best-match');
   const [searchCenter, setSearchCenter] = React.useState<SearchCenter | null>(null);
   const [userLocation, setUserLocation] = React.useState<LocationPoint | null>(null);
-
   const [hasAppliedFilters, setHasAppliedFilters] = React.useState(false);
 
   const [spaces, setSpaces] = React.useState<Space[]>([]);
-  const [selectedSpaceId, setSelectedSpaceId] = React.useState<number | null>(null);
+  const [selectedSpaceId, setSelectedSpaceId] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -113,11 +280,19 @@ function DiscoverPageContent() {
         if (!cancelled) {
           setSpaces(data);
 
-          const matchedId = requestedSpaceId ? Number(requestedSpaceId) : null;
-          const hasMatchedSpace =
-            matchedId !== null && data.some((space) => space.id === matchedId);
+          const matchedId = requestedSpaceId ? String(requestedSpaceId) : null;
 
-          setSelectedSpaceId(hasMatchedSpace ? matchedId : data[0]?.id ?? null);
+          const hasMatchedSpace =
+            matchedId !== null &&
+            data.some((space) => getSpaceId(space) === matchedId);
+
+          setSelectedSpaceId(
+            hasMatchedSpace
+              ? matchedId
+              : data[0]
+                ? getSpaceId(data[0])
+                : null
+          );
         }
       } catch (err) {
         if (!cancelled) {
@@ -139,6 +314,7 @@ function DiscoverPageContent() {
 
   React.useEffect(() => {
     const stored = localStorage.getItem('compare-spaces');
+
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as Space[];
@@ -149,90 +325,9 @@ function DiscoverPageContent() {
     }
   }, []);
 
-  async function handleApplyFilters() {
-    setHasAppliedFilters(true);
-  
-    const query = search.trim();
-  
-    if (!query) {
-      setSearchCenter(null);
-      return;
-    }
-  
-    const keyword = query.toLowerCase();
-  
-    // 1. First try to match local POI database by name, suburb, address, category
-    const matchedSpace = spaces.find((space) => {
-      const address = String((space as any).address ?? '');
-      const postcode = String((space as any).postcode ?? '');
-  
-      const text = [
-        space.name,
-        space.suburb,
-        address,
-        postcode,
-        space.category,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-  
-      return text.includes(keyword);
-    });
-  
-    if (matchedSpace && hasValidCoordinates(matchedSpace)) {
-      const center = {
-        latitude: getSpaceLatitude(matchedSpace),
-        longitude: getSpaceLongitude(matchedSpace),
-        label: matchedSpace.name,
-      };
-  
-      setSearchCenter(center);
-      setSelectedSpaceId(matchedSpace.id);
-      return;
-    }
-  
-    // 2. If not found in local data, geocode the address/street
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=au&q=${encodeURIComponent(
-          `${query}, Melbourne, Victoria, Australia`
-        )}`
-      );
-  
-      const data = await response.json();
-  
-      if (Array.isArray(data) && data.length > 0) {
-        const firstResult = data[0];
-  
-        const center = {
-          latitude: Number(firstResult.lat),
-          longitude: Number(firstResult.lon),
-          label: firstResult.display_name || query,
-        };
-  
-        if (
-          Number.isFinite(center.latitude) &&
-          Number.isFinite(center.longitude)
-        ) {
-          setSearchCenter(center);
-          setSelectedSpaceId(null);
-          return;
-        }
-      }
-  
-      setSearchCenter(null);
-    } catch (error) {
-      console.error('Failed to geocode search query:', error);
-      setSearchCenter(null);
-    }
-  }
-
   React.useEffect(() => {
-    if (!navigator.geolocation) {
-      return;
-    }
-  
+    if (!navigator.geolocation) return;
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setUserLocation({
@@ -251,47 +346,135 @@ function DiscoverPageContent() {
     );
   }, []);
 
+  async function handleApplyFilters() {
+    setHasAppliedFilters(true);
+
+    const query = search.trim();
+
+    if (!query) {
+      setSearchCenter(null);
+      return;
+    }
+
+    const keyword = query.toLowerCase();
+
+    const matchedSpace = spaces.find((space) => {
+      const address = getStringValue(space, ['address'], '');
+      const postcode = getStringValue(space, ['postcode'], '');
+
+      const text = [
+        space.name,
+        space.suburb,
+        address,
+        postcode,
+        space.category,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return text.includes(keyword);
+    });
+
+    if (matchedSpace && hasValidCoordinates(matchedSpace)) {
+      const center = {
+        latitude: getSpaceLatitude(matchedSpace),
+        longitude: getSpaceLongitude(matchedSpace),
+        label: matchedSpace.name,
+      };
+
+      setSearchCenter(center);
+      setSelectedSpaceId(getSpaceId(matchedSpace));
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=au&q=${encodeURIComponent(
+          `${query}, Melbourne, Victoria, Australia`
+        )}`
+      );
+
+      const data = await response.json();
+
+      if (Array.isArray(data) && data.length > 0) {
+        const firstResult = data[0];
+
+        const center = {
+          latitude: Number(firstResult.lat),
+          longitude: Number(firstResult.lon),
+          label: firstResult.display_name || query,
+        };
+
+        if (
+          Number.isFinite(center.latitude) &&
+          Number.isFinite(center.longitude)
+        ) {
+          setSearchCenter(center);
+          setSelectedSpaceId(null);
+          return;
+        }
+      }
+
+      setSearchCenter(null);
+    } catch (error) {
+      console.error('Failed to geocode search query:', error);
+      setSearchCenter(null);
+    }
+  }
+
+  function handleResetFilters() {
+    setSearch('');
+    setSearchCenter(null);
+    setCategory('all');
+    setActivity('study');
+    setSortBy('best-match');
+    setHasAppliedFilters(false);
+
+    if (spaces[0]) {
+      setSelectedSpaceId(getSpaceId(spaces[0]));
+    } else {
+      setSelectedSpaceId(null);
+    }
+  }
 
   const filteredSpaces = React.useMemo(() => {
     const keyword = search.trim().toLowerCase();
     let result = [...spaces];
-  
-    // If the search has a geocoded center, show nearby places
+
     if (searchCenter) {
       const nearbyRadiusKm = 1.5;
-  
+
       result = result.filter((space) => {
-        if (!hasValidCoordinates(space)) {
-          return false;
-        }
-  
+        if (!hasValidCoordinates(space)) return false;
+
         const distanceFromSearch = getDistanceKm(searchCenter, {
           latitude: getSpaceLatitude(space),
           longitude: getSpaceLongitude(space),
         });
-  
+
         return distanceFromSearch <= nearbyRadiusKm;
       });
-  
+
       result.sort((a, b) => {
         const distanceA = getDistanceKm(searchCenter, {
           latitude: getSpaceLatitude(a),
           longitude: getSpaceLongitude(a),
         });
-  
+
         const distanceB = getDistanceKm(searchCenter, {
           latitude: getSpaceLatitude(b),
           longitude: getSpaceLongitude(b),
         });
-  
+
         return distanceA - distanceB;
       });
     } else if (keyword) {
-      // Fallback text search if geocoding failed
       result = result.filter((space) => {
-        const address = String((space as any).address ?? '');
-        const postcode = String((space as any).postcode ?? '');
-  
+        const address = getStringValue(space, ['address'], '');
+        const postcode = getStringValue(space, ['postcode'], '');
+        const openingHours = getStringValue(space, ['openingHours', 'opening_hours'], '');
+
         const haystack = [
           space.name,
           space.suburb,
@@ -301,103 +484,70 @@ function DiscoverPageContent() {
           space.reason,
           space.quietTime,
           space.crowd,
+          openingHours,
           ...(space.activityFit ?? []),
         ]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
-  
+
         return haystack.includes(keyword);
       });
     }
-  
-    // Category matches database values:
-    // study / leisure / culture / lifestyle
+
     if (category !== 'all') {
       result = result.filter((space) => {
-        const c = String(space.category ?? '').toLowerCase();
-        return c === category;
+        const categoryValue = getStringValue(space, ['category'], '').toLowerCase();
+        return categoryValue === category;
       });
     }
-  
-    // Activity is user intent
-    if (activity === 'study') {
-      result = result.filter((space) => {
-        const c = String(space.category ?? '').toLowerCase();
-        return c === 'study' || Number(space.noiseDb ?? 999) <= 65;
+
+    result = result.filter((space) => getActivityMatch(space, activity));
+
+    const distanceCenter = searchCenter ?? userLocation ?? MELBOURNE_CBD_CENTER;
+
+    result = result.map((space) => {
+      if (!hasValidCoordinates(space)) return space;
+
+      const distance = getDistanceKm(distanceCenter, {
+        latitude: getSpaceLatitude(space),
+        longitude: getSpaceLongitude(space),
       });
-    } else if (activity === 'remote work') {
-      result = result.filter((space) => {
-        const c = String(space.category ?? '').toLowerCase();
-        return (
-          c === 'study' ||
-          c === 'lifestyle' ||
-          Number(space.comfort ?? 0) >= 55
-        );
-      });
-    } else if (activity === 'relax') {
-      result = result.filter((space) => {
-        const c = String(space.category ?? '').toLowerCase();
-        return (
-          c === 'leisure' ||
-          Number(space.shade ?? 0) >= 40 ||
-          Number(space.noiseDb ?? 999) <= 60
-        );
+
+      return {
+        ...space,
+        distance: Number(distance.toFixed(2)),
+      };
+    });
+
+    if (sortBy === 'best-match') {
+      result.sort((a, b) => getBestMatchScore(b, activity) - getBestMatchScore(a, activity));
+    }
+
+    if (sortBy === 'quietest') {
+      result.sort((a, b) => {
+        const aNoise = getNumberValue(a, ['noiseDb', 'noise_db'], 999);
+        const bNoise = getNumberValue(b, ['noiseDb', 'noise_db'], 999);
+        return aNoise - bNoise;
       });
     }
-  
-  
 
-const distanceCenter = searchCenter ?? userLocation ?? MELBOURNE_CBD_CENTER;
-
-result = result.map((space) => {
-  if (!hasValidCoordinates(space)) {
-    return space;
-  }
-
-  const distance = getDistanceKm(distanceCenter, {
-    latitude: getSpaceLatitude(space),
-    longitude: getSpaceLongitude(space),
-  });
-
-  return {
-    ...space,
-    distance: Number(distance.toFixed(2)),
-  };
-});
-    
-    if (sortBy === 'distance') {
-      if (searchCenter) {
-        result.sort((a, b) => {
-          const distanceA = getDistanceKm(searchCenter, {
-            latitude: getSpaceLatitude(a),
-            longitude: getSpaceLongitude(a),
-          });
-  
-          const distanceB = getDistanceKm(searchCenter, {
-            latitude: getSpaceLatitude(b),
-            longitude: getSpaceLongitude(b),
-          });
-  
-          return distanceA - distanceB;
-        });
-      } else {
-        result.sort(
-          (a, b) => Number(a.distance ?? 999) - Number(b.distance ?? 999)
-        );
-      }
-    } else if (sortBy === 'quiet') {
-      result.sort(
-        (a, b) => Number(a.noiseDb ?? 999) - Number(b.noiseDb ?? 999)
-      );
-    } else if (sortBy === 'comfort') {
-      result.sort(
-        (a, b) => Number(b.comfort ?? 0) - Number(a.comfort ?? 0)
-      );
-    } else if (!searchCenter) {
-      result.sort((a, b) => getBestScore(b) - getBestScore(a));
+    if (sortBy === 'highest-rating') {
+      result.sort((a, b) => {
+        const aRating = getNumberValue(a, ['rating'], 0);
+        const bRating = getNumberValue(b, ['rating'], 0);
+        return bRating - aRating;
+      });
     }
-  
+
+    if (sortBy === 'most-reviews') {
+      result.sort((a, b) => {
+        const aReviews = getNumberValue(a, ['ratingCount', 'rating_count'], 0);
+        const bReviews = getNumberValue(b, ['ratingCount', 'rating_count'], 0);
+        return bReviews - aReviews;
+      });
+    }
+
     return result;
   }, [
     spaces,
@@ -416,20 +566,30 @@ result = result.map((space) => {
       return;
     }
 
-    const stillExists = filteredSpaces.some((space) => space.id === selectedSpaceId);
+    const stillExists = filteredSpaces.some(
+      (space) => getSpaceId(space) === selectedSpaceId
+    );
 
     if (!stillExists) {
-      const matchedId = requestedSpaceId ? Number(requestedSpaceId) : null;
-      const hasMatchedFilteredSpace =
-        matchedId !== null && filteredSpaces.some((space) => space.id === matchedId);
+      const matchedId = requestedSpaceId ? String(requestedSpaceId) : null;
 
-      setSelectedSpaceId(hasMatchedFilteredSpace ? matchedId : filteredSpaces[0]?.id ?? null);
+      const hasMatchedFilteredSpace =
+        matchedId !== null &&
+        filteredSpaces.some((space) => getSpaceId(space) === matchedId);
+
+      setSelectedSpaceId(
+        hasMatchedFilteredSpace
+          ? matchedId
+          : filteredSpaces[0]
+            ? getSpaceId(filteredSpaces[0])
+            : null
+      );
     }
   }, [filteredSpaces, selectedSpaceId, requestedSpaceId]);
 
   function handleAddToCompare(space: Space) {
     setCompareSpaces((prev) => {
-      const exists = prev.some((item) => item.name === space.name);
+      const exists = prev.some((item) => getSpaceId(item) === getSpaceId(space));
       if (exists) return prev;
 
       const next = prev.length >= 2 ? [prev[1], space] : [...prev, space];
@@ -438,9 +598,9 @@ result = result.map((space) => {
     });
   }
 
-  function handleRemoveFromCompare(name: string) {
+  function handleRemoveFromCompare(spaceId: string) {
     setCompareSpaces((prev) => {
-      const next = prev.filter((item) => item.name !== name);
+      const next = prev.filter((item) => getSpaceId(item) !== spaceId);
       localStorage.setItem('compare-spaces', JSON.stringify(next));
       return next;
     });
@@ -459,7 +619,7 @@ result = result.map((space) => {
   return (
     <>
       <AppNavbar />
-  
+
       <Box
         sx={{
           minHeight: '100vh',
@@ -491,7 +651,7 @@ result = result.map((space) => {
             >
               Discover spaces
             </Typography>
-  
+
             <Typography
               sx={{
                 mb: 3,
@@ -501,44 +661,141 @@ result = result.map((space) => {
             >
               Search, filter, and explore all matching spaces across Melbourne.
             </Typography>
-  
-            <Box
+
+            <Paper
+              component="form"
+              elevation={0}
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleApplyFilters();
+              }}
               sx={{
-                '& form': {
-                  bgcolor: '#fffaf1 !important',
-                  border: '1px solid #ded2bd !important',
-                  boxShadow: '0 10px 28px rgba(87, 72, 48, 0.08) !important',
+                p: { xs: 2, md: 2.2 },
+                borderRadius: '24px',
+                bgcolor: '#fffaf1',
+                border: '1px solid #ded2bd',
+                boxShadow: '0 10px 28px rgba(87, 72, 48, 0.08)',
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: '1fr',
+                  md: '1.6fr 0.8fr 0.8fr 0.8fr auto auto',
                 },
-                '& .MuiOutlinedInput-root': {
-                  bgcolor: '#fffaf1 !important',
-                  borderRadius: '12px !important',
-                },
-                '& .MuiButton-contained': {
-                  bgcolor: '#2d4a3d !important',
-                  color: '#ffffff !important',
-                  boxShadow: 'none !important',
-                },
-                '& .MuiButton-outlined': {
-                  color: '#273d34 !important',
-                  borderColor: '#d8c9ae !important',
-                  bgcolor: '#fffaf1 !important',
-                },
+                gap: 1.6,
+                alignItems: 'center',
               }}
             >
-              <FilterPanel
-                search={search}
-                category={category}
-                activity={activity}
-                sortBy={sortBy}
-                onSearchChange={setSearch}
-                onCategoryChange={setCategory}
-                onActivityChange={setActivity}
-                onSortChange={setSortBy}
-                onApply={() => setHasAppliedFilters(true)}
-                onReset={() => setHasAppliedFilters(false)}
+              <TextField
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search suburb or place"
+                fullWidth
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '14px',
+                    bgcolor: '#fffaf1',
+                  },
+                }}
               />
-            </Box>
-  
+
+              <FormControl fullWidth>
+                <InputLabel>Category</InputLabel>
+                <Select
+                  value={category}
+                  label="Category"
+                  onChange={(event) => setCategory(event.target.value as CategoryFilter)}
+                  sx={{
+                    borderRadius: '14px',
+                    bgcolor: '#fffaf1',
+                  }}
+                >
+                  <MenuItem value="all">All categories</MenuItem>
+                  <MenuItem value="study">Study</MenuItem>
+                  <MenuItem value="culture">Culture</MenuItem>
+                  <MenuItem value="leisure">Leisure</MenuItem>
+                  <MenuItem value="lifestyle">Lifestyle</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl fullWidth>
+                <InputLabel>Activity</InputLabel>
+                <Select
+                  value={activity}
+                  label="Activity"
+                  onChange={(event) => setActivity(event.target.value as ActivityFilter)}
+                  sx={{
+                    borderRadius: '14px',
+                    bgcolor: '#fffaf1',
+                  }}
+                >
+                  <MenuItem value="study">Study</MenuItem>
+                  <MenuItem value="remote-work">Remote work</MenuItem>
+                  <MenuItem value="relax">Relax</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl fullWidth>
+                <InputLabel>Sort by</InputLabel>
+                <Select
+                  value={sortBy}
+                  label="Sort by"
+                  onChange={(event) => setSortBy(event.target.value as SortFilter)}
+                  sx={{
+                    borderRadius: '14px',
+                    bgcolor: '#fffaf1',
+                  }}
+                >
+                  <MenuItem value="best-match">Best match</MenuItem>
+                  <MenuItem value="quietest">Quietest</MenuItem>
+                  <MenuItem value="highest-rating">Highest rating</MenuItem>
+                  <MenuItem value="most-reviews">Most reviews</MenuItem>
+                </Select>
+              </FormControl>
+
+              <Button
+                type="submit"
+                startIcon={<SearchRoundedIcon />}
+                variant="contained"
+                sx={{
+                  minHeight: 56,
+                  px: 3,
+                  borderRadius: '18px',
+                  textTransform: 'none',
+                  fontWeight: 900,
+                  bgcolor: '#2d4a3d',
+                  color: '#ffffff',
+                  boxShadow: 'none',
+                  '&:hover': {
+                    bgcolor: '#263f35',
+                    boxShadow: 'none',
+                  },
+                }}
+              >
+                Search
+              </Button>
+
+              <Button
+                type="button"
+                onClick={handleResetFilters}
+                variant="outlined"
+                sx={{
+                  minHeight: 56,
+                  px: 3,
+                  borderRadius: '18px',
+                  textTransform: 'none',
+                  fontWeight: 900,
+                  color: '#273d34',
+                  borderColor: '#d8c9ae',
+                  bgcolor: '#fffaf1',
+                  '&:hover': {
+                    borderColor: '#cdbb9b',
+                    bgcolor: '#f7efdf',
+                  },
+                }}
+              >
+                Reset
+              </Button>
+            </Paper>
+
             <Grid container spacing={3} sx={{ mt: 3 }}>
               <Grid size={{ xs: 12, lg: 8 }}>
                 <Paper
@@ -560,37 +817,8 @@ result = result.map((space) => {
                     selectedSpaceId={selectedSpaceId}
                     onSelectSpace={setSelectedSpaceId}
                   />
-  
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      position: { xs: 'static', md: 'absolute' },
-                      right: 22,
-                      top: 22,
-                      zIndex: 10,
-                      m: { xs: 2, md: 0 },
-                      maxWidth: 280,
-                      p: 1.6,
-                      borderRadius: '10px',
-                      bgcolor: '#fffaf1',
-                      border: '1px solid #ded2bd',
-                      boxShadow: '0 8px 24px rgba(87, 72, 48, 0.12)',
-                      display: { xs: 'none', md: 'block' },
-                    }}
-                  >
-                    <Typography
-                      sx={{
-                        color: '#52645d',
-                        fontSize: 14,
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      Explore recommended places by activity, comfort, and nearby
-                      walking distance.
-                    </Typography>
-                  </Paper>
                 </Paper>
-  
+
                 <Paper
                   elevation={0}
                   sx={{
@@ -624,7 +852,7 @@ result = result.map((space) => {
                       >
                         Compare list
                       </Typography>
-  
+
                       {compareSpaces.length === 0 ? (
                         <Typography sx={{ color: '#52645d' }}>
                           Select up to 2 spaces to compare.
@@ -633,9 +861,9 @@ result = result.map((space) => {
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                           {compareSpaces.map((item) => (
                             <Chip
-                              key={item.name}
+                              key={getSpaceId(item)}
                               label={item.name}
-                              onDelete={() => handleRemoveFromCompare(item.name)}
+                              onDelete={() => handleRemoveFromCompare(getSpaceId(item))}
                               sx={{
                                 borderRadius: '999px',
                                 bgcolor: '#eee6d8',
@@ -654,7 +882,7 @@ result = result.map((space) => {
                         </Box>
                       )}
                     </Box>
-  
+
                     <Box sx={{ display: 'flex', gap: 1.2, flexWrap: 'wrap' }}>
                       {compareSpaces.length > 0 && (
                         <Button
@@ -678,7 +906,7 @@ result = result.map((space) => {
                           Clear
                         </Button>
                       )}
-  
+
                       <Button
                         onClick={handleGoToCompare}
                         disabled={compareSpaces.length < 2}
@@ -707,7 +935,7 @@ result = result.map((space) => {
                   </Box>
                 </Paper>
               </Grid>
-  
+
               <Grid size={{ xs: 12, lg: 4 }}>
                 <Paper
                   elevation={0}
@@ -731,18 +959,18 @@ result = result.map((space) => {
                   >
                     Why these places?
                   </Typography>
-  
+
                   <Typography
                     sx={{
                       color: '#52645d',
                       lineHeight: 1.65,
                     }}
                   >
-                    Recommendations combine noise level, comfort score, shade,
-                    distance, and activity suitability.
+                    Recommendations combine noise level, weather comfort, public rating,
+                    review count, opening hours, and activity suitability.
                   </Typography>
                 </Paper>
-  
+
                 <Paper
                   elevation={0}
                   sx={{
@@ -764,7 +992,7 @@ result = result.map((space) => {
                   >
                     Quick insight
                   </Typography>
-  
+
                   <Typography sx={{ color: '#52645d' }}>
                     Best experience now:{' '}
                     <Box
@@ -780,7 +1008,7 @@ result = result.map((space) => {
                 </Paper>
               </Grid>
             </Grid>
-  
+
             <Box sx={{ mt: 5 }}>
               <Typography
                 sx={{
@@ -794,7 +1022,7 @@ result = result.map((space) => {
               >
                 All matching spaces
               </Typography>
-  
+
               <Typography
                 sx={{
                   color: '#52645d',
@@ -803,7 +1031,7 @@ result = result.map((space) => {
               >
                 Browse every result that matches your selected filters.
               </Typography>
-  
+
               {error ? (
                 <Box sx={{ color: '#b42318', fontWeight: 800 }}>{error}</Box>
               ) : isLoading ? (
@@ -838,53 +1066,52 @@ result = result.map((space) => {
                   >
                     No matching spaces
                   </Typography>
-  
+
                   <Typography sx={{ color: '#52645d', mt: 1 }}>
                     Try a different keyword or adjust your filters.
                   </Typography>
                 </Paper>
               ) : (
                 <Grid container spacing={3}>
-                  {filteredSpaces.slice(0, 6).map((space, index) => (
-                    <Grid key={space.id} size={{ xs: 12, md: 6, xl: 4 }}>
-                      <Box
-                        onClick={() => setSelectedSpaceId(space.id)}
-                        sx={{
-                          cursor: 'pointer',
-                          '& > *': {
-                            borderColor:
-                              selectedSpaceId === space.id
-                                ? '#c9775c !important'
-                                : undefined,
-                            boxShadow:
-                              selectedSpaceId === space.id
+                  {filteredSpaces.slice(0, 6).map((space, index) => {
+                    const id = getSpaceId(space);
+                    const selected = id === selectedSpaceId;
+
+                    return (
+                      <Grid key={id} size={{ xs: 12, md: 6, xl: 4 }}>
+                        <Box
+                          onClick={() => setSelectedSpaceId(id)}
+                          sx={{
+                            cursor: 'pointer',
+                            '& > *': {
+                              borderColor: selected ? '#c9775c !important' : undefined,
+                              boxShadow: selected
                                 ? '0 18px 40px rgba(201, 119, 92, 0.18) !important'
                                 : undefined,
-                          },
-                        }}
-                      >
-                        <SpaceCard
-                          space={space}
-                          rank={index + 1}
-                          selected={selectedSpaceId === space.id}
-                          onSelect={(selectedSpace) =>
-                            setSelectedSpaceId(selectedSpace.id)
-                          }
-                          onAddToCompare={handleAddToCompare}
-                          isCompared={compareSpaces.some(
-                            (item) => item.name === space.name
-                          )}
-                        />
-                      </Box>
-                    </Grid>
-                  ))}
+                            },
+                          }}
+                        >
+                          <SpaceCard
+                            space={space}
+                            rank={index + 1}
+                            selected={selected}
+                            onSelect={() => setSelectedSpaceId(id)}
+                            onAddToCompare={handleAddToCompare}
+                            isCompared={compareSpaces.some(
+                              (item) => getSpaceId(item) === id
+                            )}
+                          />
+                        </Box>
+                      </Grid>
+                    );
+                  })}
                 </Grid>
               )}
             </Box>
           </Paper>
         </Container>
       </Box>
-  
+
       <FloatingCompareButton count={compareSpaces.length} />
     </>
   );
