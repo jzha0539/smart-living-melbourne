@@ -22,6 +22,51 @@ import FloatingCompareButton from '../../components/FloatingCompareButton';
 import { ActivityType, CategoryFilter, SortType, Space } from '../../types/space';
 import { getSpaces } from '../../lib/api-client';
 
+type SearchCenter = {
+  latitude: number;
+  longitude: number;
+  label: string;
+};
+
+function getSpaceLatitude(space: Space) {
+  return Number(space.latitude);
+}
+
+function getSpaceLongitude(space: Space) {
+  return Number(space.longitude);
+}
+
+function hasValidCoordinates(space: Space) {
+  return (
+    Number.isFinite(getSpaceLatitude(space)) &&
+    Number.isFinite(getSpaceLongitude(space))
+  );
+}
+
+function getDistanceKm(
+  from: { latitude: number; longitude: number },
+  to: { latitude: number; longitude: number }
+) {
+  const earthRadiusKm = 6371;
+
+  const dLat = ((to.latitude - from.latitude) * Math.PI) / 180;
+  const dLon = ((to.longitude - from.longitude) * Math.PI) / 180;
+
+  const lat1 = (from.latitude * Math.PI) / 180;
+  const lat2 = (to.latitude * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) *
+      Math.cos(lat2) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadiusKm * c;
+}
+
 function getBestScore(space: Space) {
   return (100 - space.noiseDb) * 0.45 + space.comfort * 0.35 + space.shade * 0.2;
 }
@@ -35,6 +80,7 @@ function DiscoverPageContent() {
   const [category, setCategory] = React.useState<CategoryFilter>('all');
   const [activity, setActivity] = React.useState<ActivityType>('study');
   const [sortBy, setSortBy] = React.useState<SortType>('best');
+  const [searchCenter, setSearchCenter] = React.useState<SearchCenter | null>(null);
 
   const [hasAppliedFilters, setHasAppliedFilters] = React.useState(false);
 
@@ -94,19 +140,134 @@ function DiscoverPageContent() {
     }
   }, []);
 
+  async function handleApplyFilters() {
+    setHasAppliedFilters(true);
+  
+    const query = search.trim();
+  
+    if (!query) {
+      setSearchCenter(null);
+      return;
+    }
+  
+    const keyword = query.toLowerCase();
+  
+    // 1. First try to match local POI database by name, suburb, address, category
+    const matchedSpace = spaces.find((space) => {
+      const address = String((space as any).address ?? '');
+      const postcode = String((space as any).postcode ?? '');
+  
+      const text = [
+        space.name,
+        space.suburb,
+        address,
+        postcode,
+        space.category,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+  
+      return text.includes(keyword);
+    });
+  
+    if (matchedSpace && hasValidCoordinates(matchedSpace)) {
+      const center = {
+        latitude: getSpaceLatitude(matchedSpace),
+        longitude: getSpaceLongitude(matchedSpace),
+        label: matchedSpace.name,
+      };
+  
+      setSearchCenter(center);
+      setSelectedSpaceId(matchedSpace.id);
+      return;
+    }
+  
+    // 2. If not found in local data, geocode the address/street
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=au&q=${encodeURIComponent(
+          `${query}, Melbourne, Victoria, Australia`
+        )}`
+      );
+  
+      const data = await response.json();
+  
+      if (Array.isArray(data) && data.length > 0) {
+        const firstResult = data[0];
+  
+        const center = {
+          latitude: Number(firstResult.lat),
+          longitude: Number(firstResult.lon),
+          label: firstResult.display_name || query,
+        };
+  
+        if (
+          Number.isFinite(center.latitude) &&
+          Number.isFinite(center.longitude)
+        ) {
+          setSearchCenter(center);
+          setSelectedSpaceId(null);
+          return;
+        }
+      }
+  
+      setSearchCenter(null);
+    } catch (error) {
+      console.error('Failed to geocode search query:', error);
+      setSearchCenter(null);
+    }
+  }
+
   const filteredSpaces = React.useMemo(() => {
     if (!hasAppliedFilters) {
       return spaces;
     }
-
+  
     const keyword = search.trim().toLowerCase();
     let result = [...spaces];
-
-    if (keyword) {
+  
+    // If the search has a geocoded center, show nearby places
+    if (searchCenter) {
+      const nearbyRadiusKm = 1.5;
+  
       result = result.filter((space) => {
+        if (!hasValidCoordinates(space)) {
+          return false;
+        }
+  
+        const distanceFromSearch = getDistanceKm(searchCenter, {
+          latitude: getSpaceLatitude(space),
+          longitude: getSpaceLongitude(space),
+        });
+  
+        return distanceFromSearch <= nearbyRadiusKm;
+      });
+  
+      result.sort((a, b) => {
+        const distanceA = getDistanceKm(searchCenter, {
+          latitude: getSpaceLatitude(a),
+          longitude: getSpaceLongitude(a),
+        });
+  
+        const distanceB = getDistanceKm(searchCenter, {
+          latitude: getSpaceLatitude(b),
+          longitude: getSpaceLongitude(b),
+        });
+  
+        return distanceA - distanceB;
+      });
+    } else if (keyword) {
+      // Fallback text search if geocoding failed
+      result = result.filter((space) => {
+        const address = String((space as any).address ?? '');
+        const postcode = String((space as any).postcode ?? '');
+  
         const haystack = [
           space.name,
           space.suburb,
+          address,
+          postcode,
           space.category,
           space.reason,
           space.quietTime,
@@ -116,45 +277,88 @@ function DiscoverPageContent() {
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
-
+  
         return haystack.includes(keyword);
       });
     }
-
+  
+    // Category matches database values:
+    // study / leisure / culture / lifestyle
     if (category !== 'all') {
       result = result.filter((space) => {
-        const c = (space.category ?? '').toLowerCase();
-
-        if (category === 'Park') return c.includes('park');
-        if (category === 'Library') return c.includes('library');
-        if (category === 'Public Lounge') {
-          return c.includes('public lounge') || c.includes('lounge') || c.includes('public');
-        }
-
-        return true;
+        const c = String(space.category ?? '').toLowerCase();
+        return c === category;
       });
     }
-
+  
+    // Activity is user intent
     if (activity === 'study') {
-      result = result.filter((space) => space.noiseDb <= 65);
+      result = result.filter((space) => {
+        const c = String(space.category ?? '').toLowerCase();
+        return c === 'study' || Number(space.noiseDb ?? 999) <= 65;
+      });
     } else if (activity === 'remote work') {
-      result = result.filter((space) => space.comfort >= 55);
+      result = result.filter((space) => {
+        const c = String(space.category ?? '').toLowerCase();
+        return (
+          c === 'study' ||
+          c === 'lifestyle' ||
+          Number(space.comfort ?? 0) >= 55
+        );
+      });
     } else if (activity === 'relax') {
-      result = result.filter((space) => space.shade >= 40 || space.noiseDb <= 60);
+      result = result.filter((space) => {
+        const c = String(space.category ?? '').toLowerCase();
+        return (
+          c === 'leisure' ||
+          Number(space.shade ?? 0) >= 40 ||
+          Number(space.noiseDb ?? 999) <= 60
+        );
+      });
     }
-
+  
     if (sortBy === 'distance') {
-      result.sort((a, b) => a.distance - b.distance);
+      if (searchCenter) {
+        result.sort((a, b) => {
+          const distanceA = getDistanceKm(searchCenter, {
+            latitude: getSpaceLatitude(a),
+            longitude: getSpaceLongitude(a),
+          });
+  
+          const distanceB = getDistanceKm(searchCenter, {
+            latitude: getSpaceLatitude(b),
+            longitude: getSpaceLongitude(b),
+          });
+  
+          return distanceA - distanceB;
+        });
+      } else {
+        result.sort(
+          (a, b) => Number(a.distance ?? 999) - Number(b.distance ?? 999)
+        );
+      }
     } else if (sortBy === 'quiet') {
-      result.sort((a, b) => a.noiseDb - b.noiseDb);
+      result.sort(
+        (a, b) => Number(a.noiseDb ?? 999) - Number(b.noiseDb ?? 999)
+      );
     } else if (sortBy === 'comfort') {
-      result.sort((a, b) => b.comfort - a.comfort);
-    } else {
+      result.sort(
+        (a, b) => Number(b.comfort ?? 0) - Number(a.comfort ?? 0)
+      );
+    } else if (!searchCenter) {
       result.sort((a, b) => getBestScore(b) - getBestScore(a));
     }
-
+  
     return result;
-  }, [spaces, search, category, activity, sortBy, hasAppliedFilters]);
+  }, [
+    spaces,
+    search,
+    searchCenter,
+    category,
+    activity,
+    sortBy,
+    hasAppliedFilters,
+  ]);
 
   React.useEffect(() => {
     if (!filteredSpaces.length) {
@@ -237,17 +441,25 @@ function DiscoverPageContent() {
             </Typography>
 
             <FilterPanel
-              search={search}
-              category={category}
-              activity={activity}
-              sortBy={sortBy}
-              onSearchChange={setSearch}
-              onCategoryChange={setCategory}
-              onActivityChange={setActivity}
-              onSortChange={setSortBy}
-              onApply={() => setHasAppliedFilters(true)}
-              onReset={() => setHasAppliedFilters(false)}
-            />
+  search={search}
+  category={category}
+  activity={activity}
+  sortBy={sortBy}
+  onSearchChange={setSearch}
+  onCategoryChange={setCategory}
+  onActivityChange={setActivity}
+  onSortChange={setSortBy}
+  onApply={handleApplyFilters}
+  onReset={() => {
+    setSearch('');
+    setSearchCenter(null);
+    setCategory('all');
+    setActivity('study');
+    setSortBy('best');
+    setHasAppliedFilters(false);
+    setSelectedSpaceId(null);
+  }}
+/>
 
             <Grid container spacing={3} sx={{ mt: 1 }}>
               <Grid size={{ xs: 12, lg: 8 }}>
@@ -435,21 +647,22 @@ function DiscoverPageContent() {
                 </Paper>
               ) : (
                 <Grid container spacing={3}>
-                  {filteredSpaces.map((space, index) => (
+                  {filteredSpaces.slice(0, 6).map((space, index) => (
                     <Grid key={space.id} size={{ xs: 12, md: 6, xl: 4 }}>
                       <Box
                         onClick={() => setSelectedSpaceId(space.id)}
                         sx={{ cursor: 'pointer' }}
                       >
                         <SpaceCard
-                          space={space}
-                          rank={index + 1}
-                          highlight={index === 0}
-                          onAddToCompare={handleAddToCompare}
-                          isCompared={compareSpaces.some(
-                            (item) => item.name === space.name
-                          )}
-                        />
+  space={space}
+  rank={index + 1}
+  selected={selectedSpaceId === space.id}
+  onSelect={(selectedSpace) => setSelectedSpaceId(selectedSpace.id)}
+  onAddToCompare={handleAddToCompare}
+  isCompared={compareSpaces.some(
+    (item) => item.name === space.name
+  )}
+/>
                       </Box>
                     </Grid>
                   ))}

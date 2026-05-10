@@ -1,5 +1,12 @@
 export type ActivityType = 'study' | 'remote work' | 'relax';
-export type CategoryFilter = 'all' | 'Library' | 'Park' | 'Public Lounge';
+
+export type CategoryFilter =
+  | 'all'
+  | 'study'
+  | 'leisure'
+  | 'culture'
+  | 'lifestyle';
+
 export type SortType = 'best' | 'quiet' | 'comfort' | 'distance';
 
 export interface Space {

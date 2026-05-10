@@ -146,9 +146,10 @@ export default function FilterPanel({
           }}
         >
           <MenuItem value="all">All categories</MenuItem>
-          <MenuItem value="Library">Library</MenuItem>
-          <MenuItem value="Park">Park</MenuItem>
-          <MenuItem value="Public Lounge">Public Lounge</MenuItem>
+<MenuItem value="study">Study</MenuItem>
+<MenuItem value="leisure">Leisure</MenuItem>
+<MenuItem value="culture">Culture</MenuItem>
+<MenuItem value="lifestyle">Lifestyle</MenuItem>
         </TextField>
 
         <TextField
