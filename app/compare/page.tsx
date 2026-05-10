@@ -286,13 +286,27 @@ export default function ComparePage() {
     setSpaces([]);
   }
 
-  function handleStartRoutine(
-    space: Space,
-    activity: 'study' | 'remote work' | 'relax' = 'study'
-  ) {
-    localStorage.setItem('routine-space', JSON.stringify(space));
-    localStorage.setItem('routine-activity', activity);
-    router.push('/routine');
+  function handleStartNavigation(space: Space) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selectedSpaceName', space.name);
+      localStorage.setItem('selectedRouteSpace', space.name);
+      localStorage.setItem('routeDestination', space.name);
+      localStorage.setItem('selectedDestinationName', space.name);
+
+      localStorage.setItem(
+        'selectedRouteSpaceData',
+        JSON.stringify({
+          id: space.id,
+          name: space.name,
+          suburb: space.suburb,
+          category: space.category,
+          latitude: space.latitude,
+          longitude: space.longitude,
+        })
+      );
+    }
+
+    router.push(`/route?space=${encodeURIComponent(space.name)}`);
   }
 
   const left = spaces[0];
@@ -366,7 +380,7 @@ export default function ComparePage() {
             <Box sx={{ display: 'flex', gap: 1.2, flexWrap: 'wrap' }}>
               {left && (
                 <Button
-                  onClick={() => handleStartRoutine(left, 'study')}
+                  onClick={() => handleStartNavigation(left)}
                   variant="contained"
                   startIcon={<PlayArrowRoundedIcon />}
                   sx={{
