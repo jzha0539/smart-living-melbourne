@@ -15,14 +15,21 @@ function safeActivity(value: string | null): ActivityType {
 }
 
 function safeCategory(value: string | null): CategoryFilter {
-  if (
-    value === 'all' ||
-    value === 'Library' ||
-    value === 'Park' ||
-    value === 'Public Lounge'
-  ) {
-    return value;
-  }
+  if (!value) return 'all';
+
+  const lower = value.trim().toLowerCase();
+
+  if (lower === 'all') return 'all';
+  if (lower === 'study') return 'study';
+  if (lower === 'culture') return 'culture';
+  if (lower === 'leisure') return 'leisure';
+  if (lower === 'lifestyle') return 'lifestyle';
+
+  // Map old/mock category names into the new fixed category values
+  if (lower === 'library') return 'study';
+  if (lower === 'park') return 'leisure';
+  if (lower === 'public lounge') return 'lifestyle';
+
   return 'all';
 }
 
