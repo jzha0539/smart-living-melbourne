@@ -1,205 +1,235 @@
 'use client';
 
 import * as React from 'react';
+import { Box, Button, Paper, Typography } from '@mui/material';
 import { useRouter } from 'next/navigation';
-import {
-  Box,
-  Button,
-  Chip,
-  LinearProgress,
-  Paper,
-  Typography,
-} from '@mui/material';
-import type { Space } from '../types/space';
+import { Space } from '../types/space';
 
 type SpaceCardProps = {
   space: Space;
   rank?: number;
   selected?: boolean;
-  isCompared?: boolean;
   onSelect?: (space: Space) => void;
-  onCompare?: (space: Space) => void;
   onAddToCompare?: (space: Space) => void;
+  isCompared?: boolean;
 };
 
-function safeNumber(value: unknown, fallback = 0) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
+function getNumberValue(space: Space, keys: string[], fallback = 0): number {
+  const record = space as unknown as Record<string, unknown>;
+
+  for (const key of keys) {
+    const value = record[key];
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (
+      typeof value === 'string' &&
+      value.trim() &&
+      !Number.isNaN(Number(value))
+    ) {
+      return Number(value);
+    }
+  }
+
+  return fallback;
 }
 
-function getDistance(space: Space) {
-  const distance = Number(space.distance);
-  return Number.isFinite(distance) && distance >= 0 ? distance : null;
+function getStringValue(space: Space, keys: string[], fallback = ''): string {
+  const record = space as unknown as Record<string, unknown>;
+
+  for (const key of keys) {
+    const value = record[key];
+
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
+  }
+
+  return fallback;
 }
 
-function getWalkingText(space: Space) {
-  const distance = getDistance(space);
+function getSpaceId(space: Space): string {
+  const record = space as unknown as Record<string, unknown>;
 
-  if (distance === null) {
-    return 'Walking distance unavailable';
-  }
-
-  const minutes = Math.max(3, Math.round(distance * 12));
-  return `~${minutes} min walk`;
+  return String(
+    record.poiId ??
+      record.poi_id ??
+      record.googlePlaceId ??
+      record.google_place_id ??
+      space.id ??
+      `${space.name}-${space.latitude}-${space.longitude}`
+  );
 }
 
-function getDistanceText(space: Space) {
-  const distance = getDistance(space);
+function getWeatherFit(space: Space): number {
+  const windSpeed = getNumberValue(space, ['windSpeed', 'avg_wind_speed'], 10);
+  const temperature = getNumberValue(space, ['temperature', 'air_temperature'], 22);
+  const humidity = getNumberValue(space, ['humidity', 'relative_humidity'], 50);
 
-  if (distance === null) {
-    return 'Nearby';
-  }
-
-  return `${distance.toFixed(1)} km`;
-}
-
-function getRouteDistanceDescription(space: Space) {
-  const distance = getDistance(space);
-
-  if (distance === null) {
-    return 'Distance data unavailable';
-  }
-
-  if (distance < 1) {
-    return 'Short walk';
-  }
-
-  if (distance < 2) {
-    return 'Moderate walk';
-  }
-
-  return 'Longer walk';
-}
-
-function getSerenity(space: Space) {
-  const explicit = Number(space.serenityScore);
-
-  if (Number.isFinite(explicit)) {
-    return Math.round(explicit);
-  }
-
-  const noise = safeNumber(space.noiseDb, 70);
-  const comfort = safeNumber(space.comfort, 60);
-  const shade = safeNumber(space.shade, 0);
-
-  const noiseScore = Math.max(0, 100 - noise);
-  const score = noiseScore * 0.45 + comfort * 0.4 + shade * 0.15;
+  const score =
+    100 -
+    Math.max(0, windSpeed - 8) * 2.5 -
+    Math.abs(temperature - 22) * 3 -
+    Math.abs(humidity - 50) * 0.7;
 
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
-function getStudyTime(space: Space) {
-  if (space.quietTime) {
-    return space.quietTime;
-  }
+function getPopularityScore(space: Space): number {
+  const ratingCount = getNumberValue(space, ['ratingCount', 'rating_count'], 0);
 
-  const noise = safeNumber(space.noiseDb, 70);
-
-  if (noise <= 55) {
-    return '8am-10am';
-  }
-
-  if (noise <= 65) {
-    return '10am-12pm';
-  }
-
-  return 'before 10am';
+  if (ratingCount === 0) return 45;
+  if (ratingCount < 50) return 60;
+  if (ratingCount < 250) return 85;
+  if (ratingCount < 1000) return 76;
+  return 64;
 }
 
-function getRemoteWorkTime(space: Space) {
-  const comfort = safeNumber(space.comfort, 60);
+function getAvailabilityScore(space: Space): number {
+  const record = space as unknown as Record<string, unknown>;
+  const openingHours = getStringValue(space, ['openingHours', 'opening_hours'], '');
+  const is24_7 =
+    record.is24_7 === true || record.is24_7 === 1 || record.is24_7 === 'true';
 
-  if (comfort >= 70) {
-    return '9am-12pm';
-  }
-
-  return '10am-1pm';
+  if (is24_7) return 100;
+  if (openingHours) return 82;
+  return 48;
 }
 
-function getRelaxTime(space: Space) {
-  const shade = safeNumber(space.shade, 0);
+function getCrowdEstimate(space: Space): string {
+  const ratingCount = getNumberValue(space, ['ratingCount', 'rating_count'], 0);
 
-  if (shade >= 50) {
-    return 'before 11am or after 4pm';
-  }
-
-  return 'before 10am or after 5pm';
+  if (ratingCount >= 1000) return 'Busy';
+  if (ratingCount >= 150) return 'Moderate';
+  return 'Low';
 }
 
-function getNoiseZone(space: Space) {
-  const noise = safeNumber(space.noiseDb, 70);
+function getOpeningLabel(space: Space): string {
+  const record = space as unknown as Record<string, unknown>;
+  const is24_7 =
+    record.is24_7 === true || record.is24_7 === 1 || record.is24_7 === 'true';
 
-  if (noise <= 45) return 'Quiet Zone';
-  if (noise <= 60) return 'Moderate Zone';
-  if (noise <= 70) return 'Active Zone';
+  if (is24_7) return '24h';
 
-  return 'Busy Zone';
+  const openingHours = getStringValue(space, ['openingHours', 'opening_hours'], '');
+  if (openingHours) return 'Hours listed';
+
+  return 'Hours unknown';
 }
 
-function getCategoryLabel(category: string) {
-  if (!category) return 'Space';
-  return category.charAt(0).toUpperCase() + category.slice(1);
-}
-
-function MetricBar({
+function MetricBox({
   label,
   value,
-  suffix,
-  displayValue,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: { xs: 1.7, md: 2 },
+        borderRadius: '16px',
+        bgcolor: '#EFE8DA',
+        border: '1px solid #D8CBB8',
+        minHeight: 94,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: '0.72rem',
+          fontWeight: 900,
+          textTransform: 'uppercase',
+          letterSpacing: '0.22em',
+          color: '#8A9690',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        }}
+      >
+        {label}
+      </Typography>
+
+      <Typography
+        sx={{
+          mt: 1.1,
+          fontFamily: 'Georgia, "Times New Roman", serif',
+          fontSize: { xs: '1.45rem', md: '1.65rem' },
+          lineHeight: 1,
+          fontWeight: 700,
+          color: '#243C35',
+          wordBreak: 'break-word',
+        }}
+      >
+        {value}
+      </Typography>
+    </Paper>
+  );
+}
+
+function ScoreRow({
+  label,
+  value,
 }: {
   label: string;
   value: number;
-  suffix?: string;
-  displayValue?: string;
 }) {
   const safeValue = Math.max(0, Math.min(100, Math.round(value)));
 
   return (
-    <Box>
-      <Box
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: '120px 1fr 54px',
+        gap: 1.4,
+        alignItems: 'center',
+      }}
+    >
+      <Typography
         sx={{
-          mb: 0.8,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 2,
+          color: '#6E7771',
+          fontSize: '1rem',
         }}
       >
-        <Typography
-          sx={{
-            color: '#273d34',
-            fontWeight: 900,
-            fontSize: '1rem',
-          }}
-        >
-          {label}
-        </Typography>
+        {label}
+      </Typography>
 
-        <Typography
+      <Box
+        sx={{
+          height: 8,
+          borderRadius: 999,
+          bgcolor: '#D8CBB8',
+          overflow: 'hidden',
+        }}
+      >
+        <Box
           sx={{
-            color: '#273d34',
-            fontWeight: 900,
-            fontSize: '1rem',
-            fontFamily: 'monospace',
+            width: `${safeValue}%`,
+            height: '100%',
+            bgcolor: '#4F6B57',
+            borderRadius: 999,
           }}
-        >
-          {displayValue ?? `${safeValue}${suffix ?? ''}`}
-        </Typography>
+        />
       </Box>
 
-      <LinearProgress
-        variant="determinate"
-        value={safeValue}
+      <Typography
         sx={{
-          height: 10,
-          borderRadius: 999,
-          bgcolor: '#d8cdb8',
-          '& .MuiLinearProgress-bar': {
-            borderRadius: 999,
-            bgcolor: '#55715e',
-          },
+          textAlign: 'right',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+          color: '#243C35',
+          fontWeight: 900,
+          fontSize: '0.9rem',
         }}
-      />
+      >
+        {safeValue}%
+      </Typography>
     </Box>
   );
 }
@@ -208,54 +238,51 @@ export default function SpaceCard({
   space,
   rank = 1,
   selected = false,
-  isCompared = false,
   onSelect,
-  onCompare,
   onAddToCompare,
+  isCompared = false,
 }: SpaceCardProps) {
   const router = useRouter();
 
-  const noise = safeNumber(space.noiseDb, 70);
-  const comfort = safeNumber(space.comfort, 0);
-  const shade = safeNumber(space.shade, 0);
-  const serenity = getSerenity(space);
+  const id = getSpaceId(space);
+  const roman = ['I', 'II', 'III', 'IV', 'V', 'VI'][rank - 1] ?? String(rank);
 
-  function handleStartRoutine(event: React.MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation();
+  const name = getStringValue(space, ['name'], 'Unknown place');
+  const category = getStringValue(space, ['category'], 'place');
+  const suburb = getStringValue(space, ['suburb'], '');
+  const address = getStringValue(space, ['address'], '');
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('selectedSpaceName', space.name);
-      localStorage.setItem('selectedRouteSpace', space.name);
-      localStorage.setItem('routeDestination', space.name);
-      localStorage.setItem('selectedDestinationName', space.name);
+  const noise = getNumberValue(space, ['noiseDb', 'noise_db'], 65);
+  const comfort = getNumberValue(space, ['comfort'], 70);
+  const rating = getNumberValue(space, ['rating'], 0);
+  const ratingCount = getNumberValue(space, ['ratingCount', 'rating_count'], 0);
+  const windSpeed = getNumberValue(space, ['windSpeed', 'avg_wind_speed'], 0);
+  const temperature = getNumberValue(space, ['temperature', 'air_temperature'], 0);
+  const humidity = getNumberValue(space, ['humidity', 'relative_humidity'], 0);
+  const distance = getNumberValue(space, ['distance'], 0);
 
-      localStorage.setItem(
-        'selectedRouteSpaceData',
-        JSON.stringify({
-          id: space.id,
-          name: space.name,
-          suburb: space.suburb,
-          category: space.category,
-          latitude: space.latitude,
-          longitude: space.longitude,
-        })
-      );
-    }
+  const quietness = Math.max(0, Math.min(100, 100 - noise));
+  const weatherFit = getWeatherFit(space);
+  const popularity = getPopularityScore(space);
+  const availability = getAvailabilityScore(space);
 
-    router.push(`/route?space=${encodeURIComponent(space.name)}`);
-  }
+  const rankingScore = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        quietness * 0.22 +
+          weatherFit * 0.22 +
+          popularity * 0.18 +
+          availability * 0.16 +
+          comfort * 0.22
+      )
+    )
+  );
 
-  function handleCompare(event: React.MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation();
-
-    if (onAddToCompare) {
-      onAddToCompare(space);
-      return;
-    }
-
-    if (onCompare) {
-      onCompare(space);
-    }
+  function handleStartRoutine() {
+    localStorage.setItem('routine-space', JSON.stringify(space));
+    router.push('/routine');
   }
 
   return (
@@ -263,290 +290,298 @@ export default function SpaceCard({
       elevation={0}
       onClick={() => onSelect?.(space)}
       sx={{
-        position: 'relative',
-        height: '100%',
-        p: { xs: 2.5, md: 3 },
-        borderRadius: '24px',
-        border: selected ? '2px solid #c9775c' : '1px solid #ded2bd',
-        bgcolor: '#fbf7ed',
-        color: '#273d34',
+        p: { xs: 2.4, md: 3 },
+        borderRadius: '28px',
+        bgcolor: '#FFFDF8',
+        border: selected ? '2px solid #4F6B57' : '1px solid #D8CBB8',
         boxShadow: selected
-          ? '0 18px 44px rgba(201, 119, 92, 0.18)'
-          : '0 18px 40px rgba(87, 72, 48, 0.1)',
-        cursor: onSelect ? 'pointer' : 'default',
-        transition: 'all 180ms ease',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 2.2,
-        overflow: 'hidden',
+          ? '0 20px 46px rgba(36,60,53,0.18)'
+          : '0 12px 30px rgba(36,60,53,0.07)',
+        transition: 'all 0.26s ease',
+        height: '100%',
+        cursor: 'pointer',
         '&:hover': {
-          transform: 'translateY(-2px)',
-          boxShadow: '0 22px 48px rgba(87, 72, 48, 0.14)',
+          transform: 'translateY(-4px)',
+          boxShadow: '0 22px 48px rgba(36,60,53,0.14)',
+          borderColor: '#4F6B57',
         },
       }}
     >
       <Box
         sx={{
           display: 'flex',
-          alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 1.5,
+          gap: 2,
+          alignItems: 'flex-start',
+          mb: 2,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Chip
-            label={`✨ Top ${rank}`}
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
             sx={{
-              height: 34,
-              borderRadius: '999px',
-              bgcolor: '#c9775c',
-              color: '#fffaf1',
+              fontSize: '0.78rem',
               fontWeight: 900,
-              fontSize: '0.95rem',
-              '& .MuiChip-label': {
-                px: 1.4,
-              },
+              textTransform: 'uppercase',
+              letterSpacing: '0.26em',
+              color: '#8A9690',
+              mb: 1,
             }}
-          />
-
-          <Chip
-            label={getCategoryLabel(space.category)}
-            sx={{
-              height: 34,
-              borderRadius: '999px',
-              bgcolor: '#eee6d8',
-              color: '#273d34',
-              border: '1px solid #d8c9ae',
-              fontWeight: 900,
-              textTransform: 'capitalize',
-              fontSize: '0.95rem',
-              '& .MuiChip-label': {
-                px: 1.4,
-              },
-            }}
-          />
-        </Box>
-
-        <Chip
-          label={`📍 ${getDistanceText(space)}`}
-          sx={{
-            height: 34,
-            borderRadius: '999px',
-            bgcolor: '#fffaf1',
-            border: '1px solid #d8c9ae',
-            color: '#273d34',
-            fontWeight: 900,
-            fontSize: '0.95rem',
-            '& .MuiChip-label': {
-              px: 1.4,
-            },
-          }}
-        />
-      </Box>
-
-      <Box>
-        <Typography
-          sx={{
-            color: '#273d34',
-            fontFamily: 'Georgia, serif',
-            fontWeight: 900,
-            fontSize: {
-              xs: '2rem',
-              md: '2.3rem',
-            },
-            lineHeight: 1.05,
-            letterSpacing: '-0.04em',
-          }}
-        >
-          {space.name}
-        </Typography>
-
-        <Typography
-          sx={{
-            mt: 1,
-            color: '#68766d',
-            fontSize: '1.08rem',
-          }}
-        >
-          {space.suburb || 'Melbourne'}
-        </Typography>
-      </Box>
-
-      <Chip
-        label={`Serenity ${serenity}/100`}
-        sx={{
-          alignSelf: 'flex-start',
-          height: 32,
-          borderRadius: '999px',
-          bgcolor: '#fffaf1',
-          border: '1px solid #d8c9ae',
-          color: '#486445',
-          fontWeight: 900,
-          fontSize: '0.95rem',
-        }}
-      />
-
-      <Box sx={{ display: 'grid', gap: 2.2 }}>
-        <Box>
-          <MetricBar
-            label="Noise"
-            value={noise}
-            displayValue={`${Math.round(noise)} dB`}
-          />
+          >
+            Recommended from ranking
+          </Typography>
 
           <Typography
             sx={{
-              mt: 0.9,
-              color: '#68766d',
-              fontSize: '1rem',
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontSize: { xs: '2rem', md: '2.35rem' },
+              lineHeight: 1.02,
+              fontWeight: 700,
+              color: '#243C35',
+              letterSpacing: '-0.045em',
             }}
           >
-            {getNoiseZone(space)}
+            {name}
           </Typography>
+
+          <Typography
+            sx={{
+              mt: 1,
+              color: '#6E7771',
+              fontSize: '1rem',
+              lineHeight: 1.5,
+            }}
+          >
+            {category.charAt(0).toUpperCase() + category.slice(1)}
+            {suburb ? ` · ${suburb}` : ''}
+            {distance > 0 ? ` · ${distance.toFixed(1)} km` : ''}
+          </Typography>
+
+          {address && (
+            <Typography
+              sx={{
+                mt: 0.6,
+                color: '#8A9690',
+                fontSize: '0.92rem',
+                lineHeight: 1.45,
+              }}
+            >
+              {address}
+            </Typography>
+          )}
         </Box>
 
-        <MetricBar
-          label="Comfort"
-          value={comfort}
-          displayValue={`${Math.round(comfort)}/100`}
-        />
+        <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+          <Typography
+            sx={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontStyle: 'italic',
+              fontSize: '1.8rem',
+              color: '#D8845F',
+              fontWeight: 700,
+              lineHeight: 1,
+            }}
+          >
+            {roman}
+          </Typography>
 
-        <MetricBar
-          label="Shade"
-          value={shade}
-          displayValue={`${Math.round(shade)}%`}
-        />
+          <Typography
+            sx={{
+              mt: 1,
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              fontSize: '1.15rem',
+              color: '#4F6B57',
+              fontWeight: 900,
+            }}
+          >
+            {rankingScore}
+            <Box
+              component="span"
+              sx={{
+                color: '#8A9690',
+                fontSize: '0.72rem',
+              }}
+            >
+              /100
+            </Box>
+          </Typography>
+        </Box>
       </Box>
-
-      <Paper
-        elevation={0}
-        sx={{
-          mt: 1,
-          p: 2.2,
-          borderRadius: '18px',
-          border: '1px solid #ded2bd',
-          bgcolor: '#fffaf1',
-        }}
-      >
-        <Typography
-          sx={{
-            mb: 1.2,
-            color: '#9a8f7e',
-            fontSize: 13,
-            fontWeight: 900,
-            letterSpacing: '0.22em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Best time to visit
-        </Typography>
-
-        <Typography sx={{ color: '#273d34', mb: 0.8, fontSize: '1rem' }}>
-          <strong>Study:</strong> {getStudyTime(space)}
-        </Typography>
-
-        <Typography sx={{ color: '#273d34', mb: 0.8, fontSize: '1rem' }}>
-          <strong>Remote work:</strong> {getRemoteWorkTime(space)}
-        </Typography>
-
-        <Typography sx={{ color: '#273d34', fontSize: '1rem' }}>
-          <strong>Relax:</strong> {getRelaxTime(space)}
-        </Typography>
-      </Paper>
-
-      <Paper
-        elevation={0}
-        sx={{
-          p: 2.2,
-          borderRadius: '18px',
-          border: '1px solid #ded2bd',
-          bgcolor: '#fffaf1',
-        }}
-      >
-        <Typography
-          sx={{
-            mb: 1.2,
-            color: '#273d34',
-            fontSize: 13,
-            fontWeight: 900,
-            letterSpacing: '0.22em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Route insight
-        </Typography>
-
-        <Typography sx={{ color: '#273d34', mb: 0.8, fontSize: '1rem' }}>
-          ⏱ {getWalkingText(space)}
-        </Typography>
-
-        <Typography sx={{ color: '#68766d', fontSize: '1rem' }}>
-          {getRouteDistanceDescription(space)}
-        </Typography>
-      </Paper>
 
       <Box
         sx={{
-          mt: 'auto',
-          pt: 2,
-          borderTop: '1px dashed #d8c9ae',
+          mt: 2,
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr 1fr',
+            sm: 'repeat(4, 1fr)',
+          },
+          gap: 1.2,
+        }}
+      >
+        <MetricBox label="Noise" value={`${Math.round(noise)} dB`} />
+        <MetricBox label="Weather Fit" value={`${weatherFit}/100`} />
+        <MetricBox label="Popularity" value={`${popularity}/100`} />
+        <MetricBox
+          label="Rating"
+          value={rating > 0 ? `${rating.toFixed(1)}★` : 'N/A'}
+        />
+      </Box>
+
+      <Box
+        sx={{
+          mt: 1.2,
           display: 'grid',
           gridTemplateColumns: {
             xs: '1fr',
-            md: '1fr auto',
+            sm: '1fr 1fr',
           },
           gap: 1.2,
-          alignItems: 'center',
+        }}
+      >
+        <MetricBox label="Wind" value={`${windSpeed.toFixed(1)} km/h`} />
+        <MetricBox
+          label="Air"
+          value={`${temperature.toFixed(1)}°C · ${Math.round(humidity)}%`}
+        />
+      </Box>
+
+      <Box
+        sx={{
+          mt: 2.4,
+          pl: 1.8,
+          borderLeft: '3px solid #4F6B57',
+          color: '#6E7771',
+          fontFamily: 'Georgia, "Times New Roman", serif',
+          fontStyle: 'italic',
+          fontSize: '1.05rem',
+          lineHeight: 1.55,
+        }}
+      >
+        Ranked highly because it balances quietness, popularity, weather comfort,
+        public rating, and availability using the new POI dataset.
+      </Box>
+
+      <Box
+        sx={{
+          mt: 2.4,
+          display: 'grid',
+          gap: 1.1,
+        }}
+      >
+        <ScoreRow label="Quietness" value={quietness} />
+        <ScoreRow label="Weather" value={weatherFit} />
+        <ScoreRow label="Popularity" value={popularity} />
+        <ScoreRow label="Availability" value={availability} />
+      </Box>
+
+      <Box
+        sx={{
+          mt: 2.2,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 1,
+        }}
+      >
+        <Box
+          sx={{
+            px: 1.4,
+            py: 0.7,
+            borderRadius: 999,
+            border: '1px solid #D8CBB8',
+            bgcolor: '#FFFDF8',
+            color: '#243C35',
+            fontWeight: 800,
+            fontSize: '0.82rem',
+          }}
+        >
+          Crowd estimate: {getCrowdEstimate(space)}
+        </Box>
+
+        <Box
+          sx={{
+            px: 1.4,
+            py: 0.7,
+            borderRadius: 999,
+            border: '1px solid #D8CBB8',
+            bgcolor: '#FFFDF8',
+            color: '#243C35',
+            fontWeight: 800,
+            fontSize: '0.82rem',
+          }}
+        >
+          {ratingCount} reviews
+        </Box>
+
+        <Box
+          sx={{
+            px: 1.4,
+            py: 0.7,
+            borderRadius: 999,
+            border: '1px solid #D8CBB8',
+            bgcolor: '#FFFDF8',
+            color: '#243C35',
+            fontWeight: 800,
+            fontSize: '0.82rem',
+          }}
+        >
+          {getOpeningLabel(space)}
+        </Box>
+      </Box>
+
+      <Box
+        sx={{
+          mt: 2.6,
+          pt: 2,
+          borderTop: '1px dashed #D8CBB8',
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: '1fr 1fr',
+          },
+          gap: 1,
         }}
       >
         <Button
-          onClick={handleStartRoutine}
-          variant="contained"
+          onClick={(event) => {
+            event.stopPropagation();
+            handleStartRoutine();
+          }}
           sx={{
-            borderRadius: '18px',
-            bgcolor: '#2d4a3d',
-            color: '#ffffff',
+            px: 2,
+            py: 1.25,
+            borderRadius: '16px',
             textTransform: 'none',
             fontWeight: 900,
-            py: 1.45,
-            px: 3,
-            fontSize: '1rem',
-            boxShadow: 'none',
+            bgcolor: '#243C35',
+            color: '#FFFDF8',
             '&:hover': {
-              bgcolor: '#263f35',
-              boxShadow: 'none',
+              bgcolor: '#182B25',
             },
           }}
         >
-          Start routine
+          I'm going here
         </Button>
 
         <Button
-          onClick={handleCompare}
-          variant="outlined"
-          disabled={isCompared}
+          onClick={(event) => {
+            event.stopPropagation();
+            onAddToCompare?.(space);
+          }}
           sx={{
-            borderRadius: '18px',
-            px: 2.6,
-            color: isCompared ? '#9a8f7e' : '#273d34',
-            borderColor: '#d8c9ae',
-            bgcolor: '#eee6d8',
+            px: 2,
+            py: 1.25,
+            borderRadius: '16px',
             textTransform: 'none',
             fontWeight: 900,
-            py: 1.35,
-            fontSize: '1rem',
-            whiteSpace: 'nowrap',
+            bgcolor: isCompared ? '#243C35' : '#EFE8DA',
+            color: isCompared ? '#FFFDF8' : '#243C35',
+            border: '1px solid #D8CBB8',
             '&:hover': {
-              borderColor: '#cdbb9b',
-              bgcolor: '#e5dbc9',
-            },
-            '&.Mui-disabled': {
-              bgcolor: '#eee6d8',
-              color: '#9a8f7e',
+              bgcolor: isCompared ? '#243C35' : '#E4D9C8',
             },
           }}
         >
-          {isCompared ? 'Added' : '+ Compare'}
+          {isCompared ? 'Added to compare' : 'Compare with others'}
         </Button>
       </Box>
     </Paper>

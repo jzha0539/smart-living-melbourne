@@ -307,6 +307,19 @@ function StatCard({
   );
 }
 
+function getSpaceId(space: Space): string {
+  const record = space as unknown as Record<string, unknown>;
+
+  return String(
+    record.poiId ??
+      record.poi_id ??
+      record.googlePlaceId ??
+      record.google_place_id ??
+      space.id ??
+      `${space.name}-${space.latitude}-${space.longitude}`
+  );
+}
+
 function HomeRecommendationCard({
   space,
   rank,
@@ -665,7 +678,7 @@ function HomeRecommendationCard({
 
       <Button
         component={Link}
-        href={`/discover?spaceId=${space.id}`}
+        href={`/discover?spaceId=${getSpaceId(space)}`}
         sx={{
           mt: 1,
           width: '100%',

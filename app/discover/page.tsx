@@ -14,7 +14,6 @@ import {
   MenuItem,
   Paper,
   Select,
-  TextField,
   Typography,
 } from '@mui/material';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
@@ -28,8 +27,15 @@ import { Space } from '../../types/space';
 import { getSpaces } from '../../lib/api-client';
 
 type CategoryFilter = 'all' | 'study' | 'culture' | 'leisure' | 'lifestyle';
+
 type ActivityFilter = 'study' | 'remote-work' | 'relax';
-type SortFilter = 'best-match' | 'quietest' | 'highest-rating' | 'most-reviews';
+
+type SortFilter =
+  | 'best-match'
+  | 'nearest'
+  | 'quietest'
+  | 'highest-rating'
+  | 'most-reviews';
 
 type SearchCenter = {
   latitude: number;
@@ -42,10 +48,28 @@ type LocationPoint = {
   longitude: number;
 };
 
-const MELBOURNE_CBD_CENTER: LocationPoint = {
+type SearchSuggestion = {
+  mapboxId: string;
+  name: string;
+  label: string;
+  featureType: string;
+  postcode: string;
+  suburb: string;
+};
+
+const MELBOURNE_CBD_CENTER: SearchCenter = {
   latitude: -37.8136,
   longitude: 144.9631,
+  label: 'Melbourne CBD, Victoria, Australia',
 };
+
+function createSessionToken() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
 function getSpaceId(space: Space): string {
   const record = space as unknown as Record<string, unknown>;
@@ -70,7 +94,11 @@ function getNumberValue(space: Space, keys: string[], fallback = 0): number {
       return value;
     }
 
-    if (typeof value === 'string' && value.trim() && !Number.isNaN(Number(value))) {
+    if (
+      typeof value === 'string' &&
+      value.trim() &&
+      !Number.isNaN(Number(value))
+    ) {
       return Number(value);
     }
   }
@@ -139,18 +167,115 @@ function getDistanceKm(from: LocationPoint, to: LocationPoint) {
   return earthRadiusKm * c;
 }
 
+async function reverseGeocodeLocation(point: LocationPoint): Promise<string> {
+  try {
+    const response = await fetch(
+      `/api/geocode/reverse?lat=${point.latitude}&lng=${point.longitude}`,
+      { cache: 'no-store' }
+    );
+
+    if (!response.ok) {
+      return 'Your current location';
+    }
+
+    const json = await response.json();
+
+    return json?.data?.label || 'Your current location';
+  } catch {
+    return 'Your current location';
+  }
+}
+
+async function geocodeAddress(query: string): Promise<SearchCenter | null> {
+  try {
+    const response = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`, {
+      cache: 'no-store',
+    });
+
+    const json = await response.json();
+
+    if (!response.ok || !json.success || !json.data) {
+      return null;
+    }
+
+    const latitude = Number(json.data.latitude);
+    const longitude = Number(json.data.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return null;
+    }
+
+    if (latitude < -39 || latitude > -36 || longitude < 143 || longitude > 146) {
+      return null;
+    }
+
+    return {
+      latitude,
+      longitude,
+      label: json.data.label || query,
+    };
+  } catch (error) {
+    console.error('Failed to geocode search query:', error);
+    return null;
+  }
+}
+
+async function retrieveSuggestion(
+  mapboxId: string,
+  sessionToken: string
+): Promise<SearchCenter | null> {
+  try {
+    const response = await fetch(
+      `/api/search-retrieve?mapboxId=${encodeURIComponent(
+        mapboxId
+      )}&sessionToken=${encodeURIComponent(sessionToken)}`,
+      { cache: 'no-store' }
+    );
+
+    const json = await response.json();
+
+    if (!response.ok || !json.success || !json.data) {
+      return null;
+    }
+
+    const latitude = Number(json.data.latitude);
+    const longitude = Number(json.data.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return null;
+    }
+
+    if (latitude < -39 || latitude > -36 || longitude < 143 || longitude > 146) {
+      return null;
+    }
+
+    return {
+      latitude,
+      longitude,
+      label: json.data.label || 'Selected location',
+    };
+  } catch (error) {
+    console.error('Failed to retrieve suggestion:', error);
+    return null;
+  }
+}
+
 function getActivityMatch(space: Space, activity: ActivityFilter): boolean {
   const category = getStringValue(space, ['category'], '').toLowerCase();
   const name = getStringValue(space, ['name'], '').toLowerCase();
   const noiseDb = getNumberValue(space, ['noiseDb', 'noise_db'], 65);
   const rating = getNumberValue(space, ['rating'], 0);
   const ratingCount = getNumberValue(space, ['ratingCount', 'rating_count'], 0);
-  const openingHours = getStringValue(space, ['openingHours', 'opening_hours'], '');
+  const openingHours = getStringValue(
+    space,
+    ['openingHours', 'opening_hours'],
+    ''
+  );
 
   if (activity === 'study') {
     return (
       category === 'study' ||
-      noiseDb <= 60 ||
+      noiseDb <= 62 ||
       name.includes('library') ||
       name.includes('book') ||
       name.includes('study')
@@ -160,8 +285,8 @@ function getActivityMatch(space: Space, activity: ActivityFilter): boolean {
   if (activity === 'remote-work') {
     return (
       category === 'study' ||
-      (category === 'lifestyle' && noiseDb <= 62) ||
-      (rating >= 4.2 && Boolean(openingHours) && noiseDb <= 65)
+      category === 'lifestyle' ||
+      (rating >= 4.1 && Boolean(openingHours) && noiseDb <= 68)
     );
   }
 
@@ -169,7 +294,8 @@ function getActivityMatch(space: Space, activity: ActivityFilter): boolean {
     return (
       category === 'leisure' ||
       category === 'culture' ||
-      (noiseDb <= 65 && ratingCount < 800)
+      noiseDb <= 68 ||
+      ratingCount < 900
     );
   }
 
@@ -178,17 +304,33 @@ function getActivityMatch(space: Space, activity: ActivityFilter): boolean {
 
 function getBestMatchScore(space: Space, activity: ActivityFilter): number {
   const category = getStringValue(space, ['category'], '').toLowerCase();
+  const name = getStringValue(space, ['name'], '').toLowerCase();
+
   const noiseDb = getNumberValue(space, ['noiseDb', 'noise_db'], 65);
   const comfort = getNumberValue(space, ['comfort'], 70);
   const rating = getNumberValue(space, ['rating'], 0);
   const ratingCount = getNumberValue(space, ['ratingCount', 'rating_count'], 0);
+  const distance = getNumberValue(space, ['distance'], 999);
   const windSpeed = getNumberValue(space, ['windSpeed', 'avg_wind_speed'], 10);
-  const temperature = getNumberValue(space, ['temperature', 'air_temperature'], 22);
+  const temperature = getNumberValue(
+    space,
+    ['temperature', 'air_temperature'],
+    22
+  );
   const humidity = getNumberValue(space, ['humidity', 'relative_humidity'], 50);
-  const openingHours = getStringValue(space, ['openingHours', 'opening_hours'], '');
+  const openingHours = getStringValue(
+    space,
+    ['openingHours', 'opening_hours'],
+    ''
+  );
+
+  const record = space as unknown as Record<string, unknown>;
+  const is24_7 =
+    record.is24_7 === true || record.is24_7 === 1 || record.is24_7 === 'true';
 
   const quietScore = Math.max(0, Math.min(100, 100 - noiseDb));
-  const ratingScore = rating > 0 ? Math.max(0, Math.min(100, (rating / 5) * 100)) : 55;
+  const ratingScore =
+    rating > 0 ? Math.max(0, Math.min(100, (rating / 5) * 100)) : 55;
 
   const weatherScore = Math.max(
     0,
@@ -208,26 +350,28 @@ function getBestMatchScore(space: Space, activity: ActivityFilter): number {
       ? 45
       : ratingCount < 50
         ? 60
-        : ratingCount < 200
-          ? 85
-          : ratingCount < 800
-            ? 75
-            : 62;
+        : ratingCount < 250
+          ? 86
+          : ratingCount < 1000
+            ? 76
+            : 64;
 
-  const availabilityScore = openingHours ? 80 : 45;
+  const availabilityScore = is24_7 ? 100 : openingHours ? 82 : 48;
+  const distanceScore = Math.max(0, Math.min(100, 100 - distance * 12));
 
   let activityBonus = 0;
 
   if (activity === 'study') {
-    if (category === 'study') activityBonus += 20;
-    if (noiseDb <= 55) activityBonus += 15;
+    if (category === 'study') activityBonus += 22;
+    if (noiseDb <= 55) activityBonus += 14;
+    if (name.includes('library') || name.includes('book')) activityBonus += 12;
   }
 
   if (activity === 'remote-work') {
-    if (category === 'study') activityBonus += 15;
+    if (category === 'study') activityBonus += 14;
     if (category === 'lifestyle') activityBonus += 12;
     if (openingHours) activityBonus += 10;
-    if (rating >= 4.2) activityBonus += 10;
+    if (rating >= 4.2) activityBonus += 8;
   }
 
   if (activity === 'relax') {
@@ -237,11 +381,12 @@ function getBestMatchScore(space: Space, activity: ActivityFilter): number {
   }
 
   return (
-    comfort * 0.25 +
-    quietScore * 0.25 +
-    weatherScore * 0.2 +
-    ratingScore * 0.15 +
-    popularityScore * 0.1 +
+    distanceScore * 0.35 +
+    comfort * 0.18 +
+    quietScore * 0.16 +
+    weatherScore * 0.12 +
+    ratingScore * 0.08 +
+    popularityScore * 0.06 +
     availabilityScore * 0.05 +
     activityBonus
   );
@@ -252,16 +397,36 @@ function DiscoverPageContent() {
   const searchParams = useSearchParams();
   const requestedSpaceId = searchParams.get('spaceId');
 
-  const [search, setSearch] = React.useState('');
+  const searchInputRef = React.useRef<HTMLInputElement | null>(null);
+  const sessionTokenRef = React.useRef(createSessionToken());
+  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestionRequestSeq = React.useRef(0);
+
+  const [appliedSearch, setAppliedSearch] = React.useState('');
+  const [suggestions, setSuggestions] = React.useState<SearchSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const [isSuggesting, setIsSuggesting] = React.useState(false);
+
   const [category, setCategory] = React.useState<CategoryFilter>('all');
   const [activity, setActivity] = React.useState<ActivityFilter>('study');
   const [sortBy, setSortBy] = React.useState<SortFilter>('best-match');
-  const [searchCenter, setSearchCenter] = React.useState<SearchCenter | null>(null);
-  const [userLocation, setUserLocation] = React.useState<LocationPoint | null>(null);
+
+  const [searchCenter, setSearchCenter] =
+    React.useState<SearchCenter | null>(null);
+  const [originLabel, setOriginLabel] = React.useState(
+    'Finding your location...'
+  );
   const [hasAppliedFilters, setHasAppliedFilters] = React.useState(false);
+  const [hasInitialisedOrigin, setHasInitialisedOrigin] =
+    React.useState(false);
+  const [detailSpaceId, setDetailSpaceId] = React.useState<string | null>(
+    requestedSpaceId ? String(requestedSpaceId) : null
+  );
 
   const [spaces, setSpaces] = React.useState<Space[]>([]);
-  const [selectedSpaceId, setSelectedSpaceId] = React.useState<string | null>(null);
+  const [selectedSpaceId, setSelectedSpaceId] = React.useState<string | null>(
+    null
+  );
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -279,20 +444,6 @@ function DiscoverPageContent() {
 
         if (!cancelled) {
           setSpaces(data);
-
-          const matchedId = requestedSpaceId ? String(requestedSpaceId) : null;
-
-          const hasMatchedSpace =
-            matchedId !== null &&
-            data.some((space) => getSpaceId(space) === matchedId);
-
-          setSelectedSpaceId(
-            hasMatchedSpace
-              ? matchedId
-              : data[0]
-                ? getSpaceId(data[0])
-                : null
-          );
         }
       } catch (err) {
         if (!cancelled) {
@@ -310,7 +461,7 @@ function DiscoverPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [requestedSpaceId]);
+  }, []);
 
   React.useEffect(() => {
     const stored = localStorage.getItem('compare-spaces');
@@ -326,17 +477,67 @@ function DiscoverPageContent() {
   }, []);
 
   React.useEffect(() => {
-    if (!navigator.geolocation) return;
+    if (!spaces.length || hasInitialisedOrigin) return;
+
+    const matchedSpace =
+      detailSpaceId !== null
+        ? spaces.find((space) => getSpaceId(space) === detailSpaceId)
+        : null;
+
+    if (matchedSpace && hasValidCoordinates(matchedSpace)) {
+      const matchedId = getSpaceId(matchedSpace);
+
+      setSelectedSpaceId(matchedId);
+      setSearchCenter({
+        latitude: getSpaceLatitude(matchedSpace),
+        longitude: getSpaceLongitude(matchedSpace),
+        label: matchedSpace.name,
+      });
+      setOriginLabel(`${matchedSpace.name} · selected from details`);
+      setSortBy('nearest');
+      setHasInitialisedOrigin(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    function useFallbackLocation() {
+      if (cancelled) return;
+
+      setSearchCenter(MELBOURNE_CBD_CENTER);
+      setOriginLabel(MELBOURNE_CBD_CENTER.label);
+      setAppliedSearch('');
+      setSelectedSpaceId(null);
+      setHasInitialisedOrigin(true);
+    }
+
+    if (!navigator.geolocation) {
+      useFallbackLocation();
+      return;
+    }
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setUserLocation({
+      async (position) => {
+        const point = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
+        };
+
+        const label = await reverseGeocodeLocation(point);
+
+        if (cancelled) return;
+
+        setSearchCenter({
+          ...point,
+          label,
         });
+        setOriginLabel(label);
+        setAppliedSearch('');
+        setSelectedSpaceId(null);
+        setHasInitialisedOrigin(true);
       },
-      (error) => {
-        console.warn('Unable to get user location:', error);
+      () => {
+        useFallbackLocation();
       },
       {
         enableHighAccuracy: true,
@@ -344,191 +545,246 @@ function DiscoverPageContent() {
         maximumAge: 60000,
       }
     );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [spaces, detailSpaceId, hasInitialisedOrigin]);
+
+  React.useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
   }, []);
+
+  function scheduleSuggestionSearch(value: string) {
+    const query = value.trim();
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    if (query.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setIsSuggesting(false);
+      return;
+    }
+
+    const requestId = suggestionRequestSeq.current + 1;
+    suggestionRequestSeq.current = requestId;
+
+    debounceRef.current = setTimeout(async () => {
+      try {
+        setIsSuggesting(true);
+
+        const response = await fetch(
+          `/api/search-suggest?q=${encodeURIComponent(
+            query
+          )}&sessionToken=${encodeURIComponent(sessionTokenRef.current)}`,
+          { cache: 'no-store' }
+        );
+
+        const json = await response.json();
+
+        if (suggestionRequestSeq.current !== requestId) {
+          return;
+        }
+
+        if (!response.ok || !json.success) {
+          setSuggestions([]);
+          setShowSuggestions(false);
+          return;
+        }
+
+        setSuggestions(json.data ?? []);
+        setShowSuggestions(true);
+      } catch {
+        if (suggestionRequestSeq.current === requestId) {
+          setSuggestions([]);
+          setShowSuggestions(false);
+        }
+      } finally {
+        if (suggestionRequestSeq.current === requestId) {
+          setIsSuggesting(false);
+        }
+      }
+    }, 350);
+  }
+
+  async function applyNewSearchCenter(center: SearchCenter, labelForInput: string) {
+    setAppliedSearch(labelForInput);
+    setSearchCenter(center);
+    setOriginLabel(center.label);
+    setSortBy('nearest');
+    setSelectedSpaceId(null);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setHasAppliedFilters(true);
+    setDetailSpaceId(null);
+    sessionTokenRef.current = createSessionToken();
+
+    if (requestedSpaceId) {
+      router.replace('/discover', { scroll: false });
+    }
+  }
+
+  async function handleSelectSuggestion(suggestion: SearchSuggestion) {
+    const selected = await retrieveSuggestion(
+      suggestion.mapboxId,
+      sessionTokenRef.current
+    );
+
+    if (!selected) {
+      return;
+    }
+
+    if (searchInputRef.current) {
+      searchInputRef.current.value = suggestion.name;
+    }
+
+    await applyNewSearchCenter(selected, suggestion.name);
+  }
 
   async function handleApplyFilters() {
     setHasAppliedFilters(true);
 
-    const query = search.trim();
+    const query = searchInputRef.current?.value.trim() ?? '';
+    setAppliedSearch(query);
 
     if (!query) {
-      setSearchCenter(null);
-      return;
-    }
+      setSearchCenter(MELBOURNE_CBD_CENTER);
+      setOriginLabel(MELBOURNE_CBD_CENTER.label);
+      setSelectedSpaceId(null);
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setDetailSpaceId(null);
 
-    const keyword = query.toLowerCase();
-
-    const matchedSpace = spaces.find((space) => {
-      const address = getStringValue(space, ['address'], '');
-      const postcode = getStringValue(space, ['postcode'], '');
-
-      const text = [
-        space.name,
-        space.suburb,
-        address,
-        postcode,
-        space.category,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-
-      return text.includes(keyword);
-    });
-
-    if (matchedSpace && hasValidCoordinates(matchedSpace)) {
-      const center = {
-        latitude: getSpaceLatitude(matchedSpace),
-        longitude: getSpaceLongitude(matchedSpace),
-        label: matchedSpace.name,
-      };
-
-      setSearchCenter(center);
-      setSelectedSpaceId(getSpaceId(matchedSpace));
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=au&q=${encodeURIComponent(
-          `${query}, Melbourne, Victoria, Australia`
-        )}`
-      );
-
-      const data = await response.json();
-
-      if (Array.isArray(data) && data.length > 0) {
-        const firstResult = data[0];
-
-        const center = {
-          latitude: Number(firstResult.lat),
-          longitude: Number(firstResult.lon),
-          label: firstResult.display_name || query,
-        };
-
-        if (
-          Number.isFinite(center.latitude) &&
-          Number.isFinite(center.longitude)
-        ) {
-          setSearchCenter(center);
-          setSelectedSpaceId(null);
-          return;
-        }
+      if (requestedSpaceId) {
+        router.replace('/discover', { scroll: false });
       }
 
-      setSearchCenter(null);
-    } catch (error) {
-      console.error('Failed to geocode search query:', error);
-      setSearchCenter(null);
+      return;
+    }
+
+    if (suggestions.length > 0) {
+      await handleSelectSuggestion(suggestions[0]);
+      return;
+    }
+
+    const geocoded = await geocodeAddress(query);
+
+    if (geocoded) {
+      if (searchInputRef.current) {
+        searchInputRef.current.value = query;
+      }
+
+      await applyNewSearchCenter(geocoded, query);
+      return;
+    }
+
+    setSearchCenter(null);
+    setOriginLabel(`No location found for "${query}"`);
+    setSelectedSpaceId(null);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setDetailSpaceId(null);
+
+    if (requestedSpaceId) {
+      router.replace('/discover', { scroll: false });
     }
   }
 
   function handleResetFilters() {
-    setSearch('');
-    setSearchCenter(null);
+    if (searchInputRef.current) {
+      searchInputRef.current.value = '';
+    }
+
+    setAppliedSearch('');
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setSearchCenter(MELBOURNE_CBD_CENTER);
+    setOriginLabel(MELBOURNE_CBD_CENTER.label);
     setCategory('all');
     setActivity('study');
     setSortBy('best-match');
     setHasAppliedFilters(false);
+    setSelectedSpaceId(null);
+    setDetailSpaceId(null);
+    sessionTokenRef.current = createSessionToken();
 
-    if (spaces[0]) {
-      setSelectedSpaceId(getSpaceId(spaces[0]));
-    } else {
-      setSelectedSpaceId(null);
-    }
+    router.replace('/discover', { scroll: false });
   }
 
   const filteredSpaces = React.useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    let result = [...spaces];
+    if (!searchCenter) return [];
 
-    if (searchCenter) {
-      const nearbyRadiusKm = 1.5;
-
-      result = result.filter((space) => {
-        if (!hasValidCoordinates(space)) return false;
-
-        const distanceFromSearch = getDistanceKm(searchCenter, {
+    let result = spaces
+      .filter((space) => hasValidCoordinates(space))
+      .map((space) => {
+        const distance = getDistanceKm(searchCenter, {
           latitude: getSpaceLatitude(space),
           longitude: getSpaceLongitude(space),
         });
 
-        return distanceFromSearch <= nearbyRadiusKm;
+        return {
+          ...space,
+          distance: Number(distance.toFixed(2)),
+        };
       });
-
-      result.sort((a, b) => {
-        const distanceA = getDistanceKm(searchCenter, {
-          latitude: getSpaceLatitude(a),
-          longitude: getSpaceLongitude(a),
-        });
-
-        const distanceB = getDistanceKm(searchCenter, {
-          latitude: getSpaceLatitude(b),
-          longitude: getSpaceLongitude(b),
-        });
-
-        return distanceA - distanceB;
-      });
-    } else if (keyword) {
-      result = result.filter((space) => {
-        const address = getStringValue(space, ['address'], '');
-        const postcode = getStringValue(space, ['postcode'], '');
-        const openingHours = getStringValue(space, ['openingHours', 'opening_hours'], '');
-
-        const haystack = [
-          space.name,
-          space.suburb,
-          address,
-          postcode,
-          space.category,
-          space.reason,
-          space.quietTime,
-          space.crowd,
-          openingHours,
-          ...(space.activityFit ?? []),
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-
-        return haystack.includes(keyword);
-      });
-    }
 
     if (category !== 'all') {
       result = result.filter((space) => {
-        const categoryValue = getStringValue(space, ['category'], '').toLowerCase();
+        const categoryValue = getStringValue(
+          space,
+          ['category'],
+          ''
+        ).toLowerCase();
+
         return categoryValue === category;
       });
     }
 
     result = result.filter((space) => getActivityMatch(space, activity));
 
-    const distanceCenter = searchCenter ?? userLocation ?? MELBOURNE_CBD_CENTER;
-
-    result = result.map((space) => {
-      if (!hasValidCoordinates(space)) return space;
-
-      const distance = getDistanceKm(distanceCenter, {
-        latitude: getSpaceLatitude(space),
-        longitude: getSpaceLongitude(space),
-      });
-
-      return {
-        ...space,
-        distance: Number(distance.toFixed(2)),
-      };
-    });
-
     if (sortBy === 'best-match') {
-      result.sort((a, b) => getBestMatchScore(b, activity) - getBestMatchScore(a, activity));
+      result.sort((a, b) => {
+        const distanceA = getNumberValue(a, ['distance'], 999);
+        const distanceB = getNumberValue(b, ['distance'], 999);
+
+        const scoreA = getBestMatchScore(a, activity);
+        const scoreB = getBestMatchScore(b, activity);
+
+        if (Math.abs(distanceA - distanceB) > 0.35) {
+          return distanceA - distanceB;
+        }
+
+        return scoreB - scoreA;
+      });
+    }
+
+    if (sortBy === 'nearest') {
+      result.sort((a, b) => {
+        return (
+          getNumberValue(a, ['distance'], 999) -
+          getNumberValue(b, ['distance'], 999)
+        );
+      });
     }
 
     if (sortBy === 'quietest') {
       result.sort((a, b) => {
         const aNoise = getNumberValue(a, ['noiseDb', 'noise_db'], 999);
         const bNoise = getNumberValue(b, ['noiseDb', 'noise_db'], 999);
-        return aNoise - bNoise;
+
+        if (aNoise !== bNoise) return aNoise - bNoise;
+
+        return (
+          getNumberValue(a, ['distance'], 999) -
+          getNumberValue(b, ['distance'], 999)
+        );
       });
     }
 
@@ -536,7 +792,13 @@ function DiscoverPageContent() {
       result.sort((a, b) => {
         const aRating = getNumberValue(a, ['rating'], 0);
         const bRating = getNumberValue(b, ['rating'], 0);
-        return bRating - aRating;
+
+        if (aRating !== bRating) return bRating - aRating;
+
+        return (
+          getNumberValue(a, ['distance'], 999) -
+          getNumberValue(b, ['distance'], 999)
+        );
       });
     }
 
@@ -544,48 +806,64 @@ function DiscoverPageContent() {
       result.sort((a, b) => {
         const aReviews = getNumberValue(a, ['ratingCount', 'rating_count'], 0);
         const bReviews = getNumberValue(b, ['ratingCount', 'rating_count'], 0);
-        return bReviews - aReviews;
+
+        if (aReviews !== bReviews) return bReviews - aReviews;
+
+        return (
+          getNumberValue(a, ['distance'], 999) -
+          getNumberValue(b, ['distance'], 999)
+        );
       });
     }
 
     return result;
-  }, [
-    spaces,
-    search,
-    searchCenter,
-    userLocation,
-    category,
-    activity,
-    sortBy,
-    hasAppliedFilters,
-  ]);
+  }, [spaces, searchCenter, category, activity, sortBy, appliedSearch, hasAppliedFilters]);
+
+  const displayedSpaces = React.useMemo(() => {
+    if (!filteredSpaces.length) return [];
+
+    if (detailSpaceId) {
+      const target = filteredSpaces.find(
+        (space) => getSpaceId(space) === detailSpaceId
+      );
+      const rest = filteredSpaces.filter(
+        (space) => getSpaceId(space) !== detailSpaceId
+      );
+
+      if (target) {
+        return [target, ...rest].slice(0, 6);
+      }
+    }
+
+    return filteredSpaces.slice(0, 6);
+  }, [filteredSpaces, detailSpaceId]);
 
   React.useEffect(() => {
-    if (!filteredSpaces.length) {
-      setSelectedSpaceId(null);
+    if (!displayedSpaces.length) {
+      if (selectedSpaceId !== null) {
+        setSelectedSpaceId(null);
+      }
       return;
     }
 
-    const stillExists = filteredSpaces.some(
+    const stillExists = displayedSpaces.some(
       (space) => getSpaceId(space) === selectedSpaceId
     );
 
     if (!stillExists) {
-      const matchedId = requestedSpaceId ? String(requestedSpaceId) : null;
-
-      const hasMatchedFilteredSpace =
-        matchedId !== null &&
-        filteredSpaces.some((space) => getSpaceId(space) === matchedId);
+      const hasDetailSpace =
+        detailSpaceId !== null &&
+        displayedSpaces.some((space) => getSpaceId(space) === detailSpaceId);
 
       setSelectedSpaceId(
-        hasMatchedFilteredSpace
-          ? matchedId
-          : filteredSpaces[0]
-            ? getSpaceId(filteredSpaces[0])
-            : null
+        hasDetailSpace ? detailSpaceId : getSpaceId(displayedSpaces[0])
       );
     }
-  }, [filteredSpaces, selectedSpaceId, requestedSpaceId]);
+  }, [displayedSpaces, selectedSpaceId, detailSpaceId]);
+
+  const handleMapSelectSpace = React.useCallback((spaceId: string | number) => {
+    setSelectedSpaceId(String(spaceId));
+  }, []);
 
   function handleAddToCompare(space: Space) {
     setCompareSpaces((prev) => {
@@ -654,12 +932,23 @@ function DiscoverPageContent() {
 
             <Typography
               sx={{
-                mb: 3,
+                mb: 1,
                 color: '#52645d',
                 fontSize: '1.02rem',
               }}
             >
-              Search, filter, and explore all matching spaces across Melbourne.
+              Search a street, address, or place name, select a suggestion, and
+              find the nearest six spaces from that origin.
+            </Typography>
+
+            <Typography
+              sx={{
+                mb: 3,
+                color: '#8a8173',
+                fontSize: '0.9rem',
+              }}
+            >
+              Current origin: {originLabel}
             </Typography>
 
             <Paper
@@ -684,25 +973,132 @@ function DiscoverPageContent() {
                 alignItems: 'center',
               }}
             >
-              <TextField
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search suburb or place"
-                fullWidth
-                sx={{
-                  '& .MuiOutlinedInput-root': {
+              <Box sx={{ position: 'relative' }}>
+                <Box
+                  component="input"
+                  ref={searchInputRef}
+                  defaultValue=""
+                  placeholder="Search street, address, or place"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  onChange={(event) => {
+                    scheduleSuggestionSearch(event.currentTarget.value);
+                  }}
+                  onFocus={() => {
+                    if (suggestions.length > 0) {
+                      setShowSuggestions(true);
+                    }
+                  }}
+                  sx={{
+                    width: '100%',
+                    height: 56,
+                    px: 2,
                     borderRadius: '14px',
+                    border: '1px solid rgba(39,61,52,0.28)',
                     bgcolor: '#fffaf1',
-                  },
-                }}
-              />
+                    color: '#273d34',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                    transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                    '&::placeholder': {
+                      color: '#9a8f7e',
+                    },
+                    '&:focus': {
+                      borderColor: '#2d4a3d',
+                      boxShadow: '0 0 0 3px rgba(45,74,61,0.12)',
+                    },
+                  }}
+                />
+
+                {showSuggestions && (suggestions.length > 0 || isSuggesting) && (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      position: 'absolute',
+                      zIndex: 200,
+                      left: 0,
+                      right: 0,
+                      top: 'calc(100% + 8px)',
+                      borderRadius: '16px',
+                      border: '1px solid #ded2bd',
+                      bgcolor: '#fffaf1',
+                      boxShadow: '0 18px 34px rgba(87, 72, 48, 0.16)',
+                      overflow: 'hidden',
+                      maxHeight: 360,
+                      overflowY: 'auto',
+                    }}
+                  >
+                    {isSuggesting && suggestions.length === 0 ? (
+                      <Box
+                        sx={{
+                          px: 2,
+                          py: 1.5,
+                          color: '#8a8173',
+                          fontSize: '0.9rem',
+                        }}
+                      >
+                        Searching suggestions...
+                      </Box>
+                    ) : (
+                      suggestions.map((item) => (
+                        <Box
+                          key={item.mapboxId}
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            handleSelectSuggestion(item);
+                          }}
+                          sx={{
+                            px: 2,
+                            py: 1.3,
+                            cursor: 'pointer',
+                            borderBottom: '1px solid rgba(222,210,189,0.65)',
+                            '&:hover': {
+                              bgcolor: '#f1eadc',
+                            },
+                            '&:last-child': {
+                              borderBottom: 'none',
+                            },
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              fontWeight: 900,
+                              color: '#273d34',
+                              fontSize: '0.95rem',
+                            }}
+                          >
+                            {item.name}
+                          </Typography>
+
+                          <Typography
+                            sx={{
+                              mt: 0.35,
+                              color: '#6c7a72',
+                              fontSize: '0.82rem',
+                              lineHeight: 1.35,
+                            }}
+                          >
+                            {item.label}
+                          </Typography>
+                        </Box>
+                      ))
+                    )}
+                  </Paper>
+                )}
+              </Box>
 
               <FormControl fullWidth>
                 <InputLabel>Category</InputLabel>
                 <Select
                   value={category}
                   label="Category"
-                  onChange={(event) => setCategory(event.target.value as CategoryFilter)}
+                  onChange={(event) =>
+                    setCategory(event.target.value as CategoryFilter)
+                  }
                   sx={{
                     borderRadius: '14px',
                     bgcolor: '#fffaf1',
@@ -721,7 +1117,9 @@ function DiscoverPageContent() {
                 <Select
                   value={activity}
                   label="Activity"
-                  onChange={(event) => setActivity(event.target.value as ActivityFilter)}
+                  onChange={(event) =>
+                    setActivity(event.target.value as ActivityFilter)
+                  }
                   sx={{
                     borderRadius: '14px',
                     bgcolor: '#fffaf1',
@@ -738,13 +1136,16 @@ function DiscoverPageContent() {
                 <Select
                   value={sortBy}
                   label="Sort by"
-                  onChange={(event) => setSortBy(event.target.value as SortFilter)}
+                  onChange={(event) =>
+                    setSortBy(event.target.value as SortFilter)
+                  }
                   sx={{
                     borderRadius: '14px',
                     bgcolor: '#fffaf1',
                   }}
                 >
                   <MenuItem value="best-match">Best match</MenuItem>
+                  <MenuItem value="nearest">Nearest</MenuItem>
                   <MenuItem value="quietest">Quietest</MenuItem>
                   <MenuItem value="highest-rating">Highest rating</MenuItem>
                   <MenuItem value="most-reviews">Most reviews</MenuItem>
@@ -813,9 +1214,9 @@ function DiscoverPageContent() {
                   }}
                 >
                   <MapPlaceholder
-                    spaces={filteredSpaces}
+                    spaces={displayedSpaces}
                     selectedSpaceId={selectedSpaceId}
-                    onSelectSpace={setSelectedSpaceId}
+                    onSelectSpace={handleMapSelectSpace}
                   />
                 </Paper>
 
@@ -863,7 +1264,9 @@ function DiscoverPageContent() {
                             <Chip
                               key={getSpaceId(item)}
                               label={item.name}
-                              onDelete={() => handleRemoveFromCompare(getSpaceId(item))}
+                              onDelete={() =>
+                                handleRemoveFromCompare(getSpaceId(item))
+                              }
                               sx={{
                                 borderRadius: '999px',
                                 bgcolor: '#eee6d8',
@@ -966,8 +1369,9 @@ function DiscoverPageContent() {
                       lineHeight: 1.65,
                     }}
                   >
-                    Recommendations combine noise level, weather comfort, public rating,
-                    review count, opening hours, and activity suitability.
+                    Search suggestions resolve a real street, address, or place
+                    into coordinates. The system then calculates the nearest
+                    matching POI records from your database.
                   </Typography>
                 </Paper>
 
@@ -994,7 +1398,7 @@ function DiscoverPageContent() {
                   </Typography>
 
                   <Typography sx={{ color: '#52645d' }}>
-                    Best experience now:{' '}
+                    Nearest best match:{' '}
                     <Box
                       component="span"
                       sx={{
@@ -1002,7 +1406,7 @@ function DiscoverPageContent() {
                         color: '#273d34',
                       }}
                     >
-                      {filteredSpaces[0]?.name ?? spaces[0]?.name ?? 'No result'}
+                      {displayedSpaces[0]?.name ?? 'No result'}
                     </Box>
                   </Typography>
                 </Paper>
@@ -1020,7 +1424,7 @@ function DiscoverPageContent() {
                   letterSpacing: '-0.04em',
                 }}
               >
-                All matching spaces
+                Nearby matching spaces
               </Typography>
 
               <Typography
@@ -1029,7 +1433,8 @@ function DiscoverPageContent() {
                   mb: 3,
                 }}
               >
-                Browse every result that matches your selected filters.
+                Showing the nearest six database places from your current or
+                searched location.
               </Typography>
 
               {error ? (
@@ -1046,7 +1451,7 @@ function DiscoverPageContent() {
                 >
                   Loading spaces...
                 </Paper>
-              ) : filteredSpaces.length === 0 ? (
+              ) : displayedSpaces.length === 0 ? (
                 <Paper
                   elevation={0}
                   sx={{
@@ -1064,16 +1469,17 @@ function DiscoverPageContent() {
                       fontFamily: 'Georgia, serif',
                     }}
                   >
-                    No matching spaces
+                    No nearby matching spaces
                   </Typography>
 
                   <Typography sx={{ color: '#52645d', mt: 1 }}>
-                    Try a different keyword or adjust your filters.
+                    Try another street, address, category, activity, or sort
+                    option.
                   </Typography>
                 </Paper>
               ) : (
                 <Grid container spacing={3}>
-                  {filteredSpaces.slice(0, 6).map((space, index) => {
+                  {displayedSpaces.map((space, index) => {
                     const id = getSpaceId(space);
                     const selected = id === selectedSpaceId;
 
@@ -1084,7 +1490,9 @@ function DiscoverPageContent() {
                           sx={{
                             cursor: 'pointer',
                             '& > *': {
-                              borderColor: selected ? '#c9775c !important' : undefined,
+                              borderColor: selected
+                                ? '#c9775c !important'
+                                : undefined,
                               boxShadow: selected
                                 ? '0 18px 40px rgba(201, 119, 92, 0.18) !important'
                                 : undefined,
