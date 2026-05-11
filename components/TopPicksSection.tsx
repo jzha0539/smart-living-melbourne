@@ -33,7 +33,7 @@ export default function TopPicksSection({ spaces }: TopPicksSectionProps) {
       <Grid container spacing={3}>
         {topPicks.map((space, index) => (
           <Grid key={space.id} size={{ xs: 12, md: 6, xl: 4 }}>
-            <SpaceCard space={space} rank={index + 1} highlight />
+            <SpaceCard space={space} rank={index + 1} selected />
           </Grid>
         ))}
       </Grid>
