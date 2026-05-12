@@ -280,9 +280,9 @@ export default function SpaceCard({
     )
   );
 
-  function handleStartRoutine() {
-    localStorage.setItem('routine-space', JSON.stringify(space));
-    router.push('/routine');
+  function handleStartRoute() {
+    localStorage.setItem('route-space', JSON.stringify(space));
+    router.push(`/route?space=${encodeURIComponent(name)}`);
   }
 
   return (
@@ -542,25 +542,25 @@ export default function SpaceCard({
         }}
       >
         <Button
-          onClick={(event) => {
-            event.stopPropagation();
-            handleStartRoutine();
-          }}
-          sx={{
-            px: 2,
-            py: 1.25,
-            borderRadius: '16px',
-            textTransform: 'none',
-            fontWeight: 900,
-            bgcolor: '#243C35',
-            color: '#FFFDF8',
-            '&:hover': {
-              bgcolor: '#182B25',
-            },
-          }}
-        >
-          I'm going here
-        </Button>
+  onClick={(event) => {
+    event.stopPropagation();
+    handleStartRoute();
+  }}
+  sx={{
+    px: 2,
+    py: 1.25,
+    borderRadius: '16px',
+    textTransform: 'none',
+    fontWeight: 900,
+    bgcolor: '#243C35',
+    color: '#FFFDF8',
+    '&:hover': {
+      bgcolor: '#182B25',
+    },
+  }}
+>
+  I'm going here
+</Button>
 
         <Button
           onClick={(event) => {

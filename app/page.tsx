@@ -349,9 +349,9 @@ function HomeRecommendationCard({
 
   const roman = ['I', 'II', 'III', 'IV', 'V', 'VI'][rank - 1] ?? String(rank);
 
-  function handleStartRoutine() {
-    localStorage.setItem('routine-space', JSON.stringify(space));
-    router.push('/routine');
+  function handleStartRoute() {
+    localStorage.setItem('route-space', JSON.stringify(space));
+    router.push(`/route?space=${encodeURIComponent(space.name)}`);
   }
 
   function MetricBox({
@@ -643,7 +643,7 @@ function HomeRecommendationCard({
         }}
       >
         <Button
-          onClick={handleStartRoutine}
+          onClick={handleStartRoute}
           sx={{
             px: 2,
             py: 1.2,
