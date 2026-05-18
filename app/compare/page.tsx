@@ -213,7 +213,7 @@ function CompareRow({
         display: 'grid',
         gridTemplateColumns: {
           xs: '1fr',
-          sm: '170px 1fr 1fr',
+          sm: '170px minmax(0, 1fr) minmax(0, 1fr)',
         },
         borderTop: '1px solid #d8ccb7',
         minHeight: { xs: 'auto', sm: 78 },
@@ -225,6 +225,8 @@ function CompareRow({
           py: { xs: 1.8, sm: 2.6 },
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'center',
+textAlign: 'center',
         }}
       >
         <Typography
@@ -245,6 +247,8 @@ function CompareRow({
           py: { xs: 0.2, sm: 2.6 },
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'center',
+textAlign: 'center',
         }}
       >
         <CompareValue value={leftValue} isWinner={winner === 'left'} />
@@ -472,59 +476,57 @@ export default function ComparePage() {
               }}
             >
               <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: {
-                    xs: '1fr',
-                    sm: '170px 1fr 1fr',
-                  },
-                  minHeight: { xs: 'auto', sm: 124 },
-                }}
-              >
-                <Box sx={{ display: { xs: 'none', sm: 'block' } }} />
+  sx={{
+    display: 'grid',
+    gridTemplateColumns: {
+      xs: '1fr',
+      sm: '170px minmax(0, 1fr) minmax(0, 1fr)',
+    },
+    minHeight: { xs: 'auto', sm: 124 },
+    borderBottom: '1px solid #D8CBB8',
+    alignItems: 'center',
+  }}
+>
+  <Box sx={{ display: { xs: 'none', sm: 'block' } }} />
 
-                <Box
-                  sx={{
-                    px: { xs: 2.2, sm: 3 },
-                    pt: { xs: 3, sm: 3.2 },
-                    pb: { xs: 1.5, sm: 3 },
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      fontFamily: '"Courier New", monospace',
-                      fontSize: { xs: '1rem', sm: '1.05rem' },
-                      fontWeight: 900,
-                      letterSpacing: '0.18em',
-                      lineHeight: 1.55,
-                      color: '#c46f4f',
-                    }}
-                  >
-                    A · {formatName(left.name)}
-                  </Typography>
-                </Box>
+  <Typography
+    sx={{
+      px: 2,
+      width: '100%',
+      boxSizing: 'border-box',
+      fontFamily: '"Courier New", monospace',
+      fontSize: { xs: '1rem', sm: '1.05rem' },
+      fontWeight: 900,
+      letterSpacing: '0.18em',
+      lineHeight: 1.55,
+      color: '#c46f4f',
+      textAlign: 'center',
+      justifySelf: 'center',
+      alignSelf: 'center',
+    }}
+  >
+    A · {formatName(left.name)}
+  </Typography>
 
-                <Box
-                  sx={{
-                    px: { xs: 2.2, sm: 3 },
-                    pt: { xs: 0, sm: 3.2 },
-                    pb: { xs: 3, sm: 3 },
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      fontFamily: '"Courier New", monospace',
-                      fontSize: { xs: '1rem', sm: '1.05rem' },
-                      fontWeight: 900,
-                      letterSpacing: '0.18em',
-                      lineHeight: 1.55,
-                      color: '#c46f4f',
-                    }}
-                  >
-                    B · {formatName(right.name)}
-                  </Typography>
-                </Box>
-              </Box>
+  <Typography
+    sx={{
+      px: 2,
+      width: '100%',
+      boxSizing: 'border-box',
+      fontFamily: '"Courier New", monospace',
+      fontSize: { xs: '1rem', sm: '1.05rem' },
+      fontWeight: 900,
+      letterSpacing: '0.18em',
+      lineHeight: 1.55,
+      color: '#c46f4f',
+      textAlign: 'center',
+      justifySelf: 'center',
+      alignSelf: 'center',
+    }}
+  >
+    B · {formatName(right.name)}
+  </Typography>
+</Box>
 
               <CompareRow
                 label="Suburb"

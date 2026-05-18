@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 
-// --- Type Definitions / 类型定义 ---
+// --- Type Definitions /  ---
 interface Space {
   name: string;
   noiseDb: number;
@@ -18,7 +18,7 @@ interface Message {
   content: string;
 }
 
-// --- Predefined Knowledge / 预设知识库 ---
+// --- Predefined Knowledge /  ---
 const MELBOURNE_KNOWLEDGE: Record<string, { q: string, a: string }> = {
   cafe: { 
     q: "Work-friendly cafes?", 
@@ -35,14 +35,14 @@ const MELBOURNE_KNOWLEDGE: Record<string, { q: string, a: string }> = {
 };
 
 export default function QuietCityAssistant() {
-  // --- State Management / 状态管理 ---
+  // --- State Management /  ---
   const [isOpen, setIsOpen] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [compareSpaces, setCompareSpaces] = useState<Space[]>([]);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   
-  // --- Initial Message / 消息初始化 ---
+  // --- Initial Message /  ---
   const initialBotMsg = "Ready to help! Select a topic or add spaces to Compare for a personalized analysis.";
   const [messages, setMessages] = useState<Message[]>([
     { role: 'bot', content: initialBotMsg }
@@ -51,14 +51,14 @@ export default function QuietCityAssistant() {
   const fabRef = useRef<HTMLButtonElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // --- Auto-scroll Logic / 自动滚动到底部 ---
+  // --- Auto-scroll Logic /  ---
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isProcessing]);
 
-  // --- Sync Context from Storage / 同步本地存储数据 ---
+  // --- Sync Context from Storage /  ---
   useEffect(() => {
     const updateContext = () => {
       const stored = localStorage.getItem('compare-spaces');
@@ -76,7 +76,7 @@ export default function QuietCityAssistant() {
     return () => window.removeEventListener('storage', updateContext);
   }, []);
 
-  // --- FAB Eye Movement Logic / 悬浮球眼神追踪逻辑 ---
+  // --- FAB Eye Movement Logic /  ---
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!fabRef.current) return;
@@ -99,7 +99,7 @@ export default function QuietCityAssistant() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
-  // --- Interaction Logic / 动作处理逻辑 ---
+  // --- Interaction Logic /  ---
   const handleAction = (type: string) => {
     if (isProcessing) return;
 
@@ -143,7 +143,7 @@ export default function QuietCityAssistant() {
 
   return (
     <>
-      {/* Floating Action Button (FAB) / 悬浮按钮 */}
+      {/* Floating Action Button (FAB) /  */}
       <div style={fabWrapperStyle}>
         <button ref={fabRef} onClick={() => setIsOpen(!isOpen)} style={fabStyle}>
           <div style={outerBorderStyle}></div>
@@ -162,10 +162,10 @@ export default function QuietCityAssistant() {
         <div style={fabLabelStyle}>Chatbot</div>
       </div>
 
-      {/* Chat Window / 聊天窗口 */}
+      {/* Chat Window /  */}
       {isOpen && (
         <div style={chatWindowStyle}>
-          {/* Header Section / 头部区域 */}
+          {/* Header Section /  */}
           <div style={headerStyle}>
             <span style={{ fontSize: '15px', fontWeight: 600 }}>Chatbot</span>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -188,7 +188,7 @@ export default function QuietCityAssistant() {
                 </svg>
               </button>
               
-              {/* Dropdown Menu / 下拉菜单 */}
+              {/* Dropdown Menu /  */}
               {showMenu && (
                 <div style={dropdownMenuStyle}>
                   <button 
@@ -211,7 +211,7 @@ export default function QuietCityAssistant() {
             </div>
           </div>
           
-          {/* Messages Body / 消息主体 */}
+          {/* Messages Body /  */}
           <div ref={scrollRef} style={chatBodyStyle}>
             {messages.map((msg, i) => (
               <div key={i} style={{ 
@@ -228,7 +228,7 @@ export default function QuietCityAssistant() {
               </div>
             ))}
 
-            {/* Processing Indicator / 处理状态指示器 */}
+            {/* Processing Indicator /  */}
             {isProcessing && (
               <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'flex-start' }}>
                 <div className="animate-pulse" style={{ 
@@ -242,7 +242,7 @@ export default function QuietCityAssistant() {
             )}
           </div>
 
-          {/* Quick Actions / 底部操作按钮 */}
+          {/* Quick Actions /  */}
           <div style={footerActionStyle}>
             <div style={sectionTitleStyle}>✨ COMPARE INSIGHTS</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
@@ -261,7 +261,7 @@ export default function QuietCityAssistant() {
         </div>
       )}
 
-      {/* Global CSS Animations / 全局动画 */}
+      {/* Global CSS Animations /  */}
       <style jsx global>{`
         @keyframes orbit-1 { 
           0% { transform: rotate(0deg) scale(1, 1.1); } 
@@ -280,7 +280,7 @@ export default function QuietCityAssistant() {
   );
 }
 
-// --- Style Definitions / 样式定义 ---
+// --- Style Definitions /  ---
 const fabWrapperStyle: React.CSSProperties = { 
   position: 'fixed', 
   bottom: '120px', 
@@ -307,7 +307,7 @@ const fabLabelStyle: React.CSSProperties = {
   marginTop: '4px', 
   fontSize: '12px', 
   fontWeight: 600, 
-  color: '#6e45e2' 
+  color: '#243C35'
 };
 
 const robotFaceStyle: React.CSSProperties = { 
@@ -324,58 +324,58 @@ const robotFaceStyle: React.CSSProperties = {
   boxShadow: '0 4px 15px rgba(0,0,0,0.08)' 
 };
 
-const eyeStyle: React.CSSProperties = { 
-  width: '7px', 
-  height: '14px', 
-  background: 'linear-gradient(to bottom, #6366f1, #a855f7)', 
-  borderRadius: '4px', 
-  transition: 'transform 0.1s ease-out' 
+const eyeStyle: React.CSSProperties = {
+  width: '7px',
+  height: '14px',
+  background: 'linear-gradient(to bottom, #243C35, #4F6B57)',
+  borderRadius: '4px',
+  transition: 'transform 0.1s ease-out',
 };
 
-const outerBorderStyle: React.CSSProperties = { 
-  position: 'absolute', 
-  width: '100%', 
-  height: '110%', 
-  borderRadius: '42%', 
-  background: 'linear-gradient(45deg, #6e45e2, #3b82f6)', 
-  animation: 'orbit-1 5s linear infinite', 
-  zIndex: 1 
+const outerBorderStyle: React.CSSProperties = {
+  position: 'absolute',
+  width: '100%',
+  height: '110%',
+  borderRadius: '42%',
+  background: 'linear-gradient(45deg, #243C35, #4F6B57)',
+  animation: 'orbit-1 5s linear infinite',
+  zIndex: 1,
 };
 
-const innerBorderStyle: React.CSSProperties = { 
-  position: 'absolute', 
-  width: '110%', 
-  height: '100%', 
-  borderRadius: '45%', 
-  background: 'linear-gradient(-45deg, #a855f7, #0ea5e9)', 
-  animation: 'orbit-2 4s linear infinite', 
-  zIndex: 2, 
-  opacity: 0.8 
+const innerBorderStyle: React.CSSProperties = {
+  position: 'absolute',
+  width: '110%',
+  height: '100%',
+  borderRadius: '45%',
+  background: 'linear-gradient(-45deg, #4F6B57, #C9D8BF)',
+  animation: 'orbit-2 4s linear infinite',
+  zIndex: 2,
+  opacity: 0.9,
 };
 
-const chatWindowStyle: React.CSSProperties = { 
-  position: 'fixed', 
-  bottom: '210px', 
-  right: '30px', 
-  width: '320px', 
-  height: '480px', 
-  backgroundColor: '#fff', 
-  borderRadius: '28px', 
-  boxShadow: '0 25px 60px rgba(0,0,0,0.15)', 
-  zIndex: 1000, 
-  overflow: 'hidden', 
-  display: 'flex', 
-  flexDirection: 'column', 
-  border: '1px solid #f0f0f0' 
+const chatWindowStyle: React.CSSProperties = {
+  position: 'fixed',
+  bottom: '210px',
+  right: '30px',
+  width: '320px',
+  height: '480px',
+  backgroundColor: '#FFFDF8',
+  borderRadius: '28px',
+  boxShadow: '0 25px 60px rgba(36,60,53,0.18)',
+  zIndex: 1000,
+  overflow: 'hidden',
+  display: 'flex',
+  flexDirection: 'column',
+  border: '1px solid #E4D9C8',
 };
 
-const headerStyle: React.CSSProperties = { 
-  background: 'linear-gradient(135deg, #6e45e2, #3b82f6)', 
-  color: '#fff', 
-  padding: '16px 20px', 
-  display: 'flex', 
-  justifyContent: 'space-between', 
-  alignItems: 'center' 
+const headerStyle: React.CSSProperties = {
+  background: 'linear-gradient(135deg, #243C35, #4F6B57)',
+  color: '#FFFDF8',
+  padding: '16px 20px',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
 };
 
 const menuIconStyle: React.CSSProperties = { 

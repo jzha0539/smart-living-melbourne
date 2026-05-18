@@ -1179,7 +1179,7 @@ const visibleNoiseRingDegrees =
                   maxWidth: 560,
                   fontFamily: 'Georgia, "Times New Roman", serif',
                   fontStyle: 'italic',
-                  fontSize: { xs: '1.05rem', md: '1.22rem' },
+                  fontSize: { xs: '1.25rem', md: '1.5rem' },
                   lineHeight: 1.55,
                   color: '#6E7771',
                 }}
@@ -1289,11 +1289,25 @@ const visibleNoiseRingDegrees =
                 <Paper
                   elevation={0}
                   sx={{
+                    position: 'relative',
+                    overflow: 'hidden',
                     p: { xs: 2.4, md: 3.4 },
                     borderRadius: '24px',
                     bgcolor: '#FFFDF8',
                     border: '2px solid #4F6B57',
                     boxShadow: '0 18px 42px rgba(36,60,53,0.08)',
+                    backgroundImage: `
+                      linear-gradient(
+                        180deg,
+                        rgba(255,253,248,0.86) 0%,
+                        rgba(255,253,248,0.80) 45%,
+                        rgba(255,253,248,0.92) 100%
+                      ),
+                      url(/images/1.jpg)
+                    `,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center center',
+                    backgroundSize: 'cover',
                   }}
                 >
                   <Box
@@ -1524,8 +1538,6 @@ const visibleNoiseRingDegrees =
                         ['quietness', 'Quietness'],
                         ['popularity', 'Popularity / crowd'],
                         ['weather', 'Weather comfort'],
-                        ['rating', 'Public rating'],
-                        ['availability', 'Availability'],
                       ].map(([key, label]) => (
                         <Box
                           key={key}
@@ -1535,7 +1547,7 @@ const visibleNoiseRingDegrees =
                             gap: 1.5,
                             alignItems: 'center',
                             borderBottom:
-                              key === 'availability'
+                              key === 'weather'
                                 ? 'none'
                                 : '1px solid rgba(216,203,184,0.9)',
                             py: 0.2,
@@ -1802,12 +1814,26 @@ const visibleNoiseRingDegrees =
                 <Paper
                   elevation={0}
                   sx={{
+                    position: 'relative',
+                    overflow: 'hidden',
                     p: { xs: 2.6, md: 3 },
                     borderRadius: '24px',
                     bgcolor: '#FFFDF8',
                     border: '1px solid #E4D9C8',
                     boxShadow: '0 18px 42px rgba(36,60,53,0.08)',
                     minHeight: '100%',
+                    backgroundImage: `
+                      linear-gradient(
+                        180deg,
+                        rgba(255,253,248,0.86) 0%,
+                        rgba(255,253,248,0.80) 45%,
+                        rgba(255,253,248,0.92) 100%
+                      ),
+                      url(/images/1.jpg)
+                    `,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center center',
+                    backgroundSize: 'cover',
                   }}
                 >
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, mb: 2 }}>

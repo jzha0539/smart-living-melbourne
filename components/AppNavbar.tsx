@@ -22,9 +22,9 @@ export default function AppNavbar() {
       elevation={0}
       sx={{
         top: 0,
-        bgcolor: 'rgba(255,255,255,0.88)',
+        bgcolor: 'rgba(255,253,248,0.92)',
         backdropFilter: 'blur(14px)',
-        borderBottom: '1px solid rgba(226,232,240,0.9)',
+        borderBottom: '1px solid #E4D9C8',
       }}
     >
       <Toolbar
@@ -44,9 +44,9 @@ export default function AppNavbar() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              bgcolor: 'primary.main',
-              color: 'white',
-              boxShadow: '0 8px 20px rgba(79,70,229,0.25)',
+              bgcolor: '#243C35',
+              color: '#FFFDF8',
+              boxShadow: '0 8px 20px rgba(36,60,53,0.18)',
               flexShrink: 0,
             }}
           >
@@ -57,7 +57,7 @@ export default function AppNavbar() {
             sx={{
               fontWeight: 900,
               letterSpacing: '-0.02em',
-              color: '#111827',
+              color: '#243C35',
               fontSize: { xs: '1rem', md: '1.1rem' },
             }}
           >
@@ -84,12 +84,18 @@ export default function AppNavbar() {
                   textTransform: 'none',
                   fontWeight: 800,
                   minWidth: 'unset',
-                  color: active ? 'primary.main' : '#111827',
-                  bgcolor: active ? 'rgba(79,70,229,0.12)' : 'transparent',
+                  color: active ? '#243C35' : '#1f2f2a',
+                  bgcolor: active ? '#E7EFE2' : 'transparent',
+                  border: active
+                    ? '1px solid #C9D8BF'
+                    : '1px solid transparent',
+                  boxShadow: active
+                    ? '0 8px 18px rgba(36,60,53,0.08)'
+                    : 'none',
                   '&:hover': {
-                    bgcolor: active
-                      ? 'rgba(79,70,229,0.16)'
-                      : 'rgba(15,23,42,0.05)',
+                    bgcolor: active ? '#DCE8D4' : '#F3EBDD',
+                    color: '#243C35',
+                    borderColor: active ? '#B8CBAE' : '#E4D9C8',
                   },
                 }}
               >
