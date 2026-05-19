@@ -1,6 +1,6 @@
 "use client";
 
-// 放置路径: components/Chatbot.tsx
+
 
 import React, { useState, useEffect, useRef } from 'react';
 
@@ -69,14 +69,13 @@ export default function QuietCityAssistant() {
 
           if (suburb) {
             setLocationInfo(suburb);
-            // 把位置消息插入到初始欢迎消息之后（index 1），
-            // 确保它排在用户提问之前
+            
             setMessages((prev) => {
               const locationMsg: Message = {
                 role: 'assistant',
                 content: `📍 I can see you're near **${suburb}**. I can recommend spaces close to you — just ask!`,
               };
-              // 如果已经有用户消息了，把位置消息插到第1条（欢迎语）后面
+              
               const insertAt = 1;
               const next = [...prev];
               next.splice(insertAt, 0, locationMsg);
@@ -84,7 +83,7 @@ export default function QuietCityAssistant() {
             });
           }
         } catch {
-          // 静默失败
+          
         }
       },
       () => {},
@@ -118,14 +117,14 @@ export default function QuietCityAssistant() {
     setIsProcessing(true);
 
     try {
-      // 过滤掉 assistant 的初始消息和位置消息，只发真实对话历史
+    
       const historyToSend = updatedMessages.filter(
         (m) => !(m.role === 'assistant' && (
           m.content === initialMsg || m.content.startsWith('📍')
         ))
       );
 
-      // 如果有位置信息，在对话最前面附加一条隐式上下文
+     
       const messagesWithLocation = locationInfo
         ? [
             { role: 'user' as const, content: `(Context: user is currently near ${locationInfo}, Melbourne)` },
@@ -177,7 +176,7 @@ export default function QuietCityAssistant() {
     "⭐ Highest rated places nearby?",
   ];
 
-  // 判断是否有真实的用户对话（排除位置消息）
+
   const hasUserMessages = messages.some((m) => m.role === 'user');
 
   return (
@@ -261,7 +260,7 @@ export default function QuietCityAssistant() {
             )}
           </div>
 
-          {/* Quick suggestions — 始终显示在输入框上方，不受对话影响 */}
+          {/* Quick suggestions */}
           {!isProcessing && showSuggestions && (
             <div style={suggestionsAreaStyle}>
               <div style={suggestionRowStyle}>

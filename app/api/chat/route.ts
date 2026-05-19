@@ -1,9 +1,9 @@
-// 放置路径: app/api/chat/route.ts
+
 
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '../../../lib/db';
 
-// 从数据库获取实时场所数据（取评分最高的前80条）
+
 async function fetchSpacesContext(): Promise<string> {
   const result = await pool.query(`
     SELECT
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid messages format.' }, { status: 400 });
     }
 
-    // 获取实时数据库数据
+
     const spacesContext = await fetchSpacesContext();
 
     const systemPrompt = `You are a helpful assistant for the Smart Living Melbourne website. Your role is to help users find the best public spaces in Melbourne based on real-time data from our database.
@@ -79,7 +79,7 @@ Guidelines:
 - If the user asks something not covered by the data (e.g. transport, pricing), answer helpfully from general knowledge but note it's not from our live data
 - Respond in the same language the user writes in (English or Chinese)`;
 
-    // 使用 Groq API（免费，速度极快，兼容 OpenAI 格式）
+
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
